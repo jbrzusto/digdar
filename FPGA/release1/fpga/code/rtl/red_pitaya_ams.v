@@ -47,28 +47,33 @@
 module red_pitaya_ams
 (
    // ADC
-   input                 clk_i           ,  //!< clock
-   input                 rstn_i          ,  //!< reset - active low
-   input      [  5-1: 0] vinp_i          ,  //!< voltages p
-   input      [  5-1: 0] vinn_i          ,  //!< voltages n
+   input                 clk_i , //!< clock
+   input                 rstn_i , //!< reset - active low
+   input [ 5-1: 0]       vinp_i , //!< voltages p
+   input [ 5-1: 0]       vinn_i , //!< voltages n
 
    // PWM DAC
-   output     [ 24-1: 0] dac_a_o         ,  //!< values used for
-   output     [ 24-1: 0] dac_b_o         ,  //!< conversion into PWM signal
-   output     [ 24-1: 0] dac_c_o         ,  //!< 
-   output     [ 24-1: 0] dac_d_o         ,  //!< 
+   output [ 24-1: 0]     dac_a_o , //!< values used for
+   output [ 24-1: 0]     dac_b_o , //!< conversion into PWM signal
+   output [ 24-1: 0]     dac_c_o , //!< 
+   output [ 24-1: 0]     dac_d_o , //!< 
+
+   output [ 12-1: 0] xadc_a_o , //!< save copy of latest slow adc value
+   output [ 12-1: 0] xadc_b_o , //!< save copy of latest slow adc value
 
    // system bus
-   input                 sys_clk_i       ,  //!< bus clock
-   input                 sys_rstn_i      ,  //!< bus reset - active low
-   input      [ 32-1: 0] sys_addr_i      ,  //!< bus address
-   input      [ 32-1: 0] sys_wdata_i     ,  //!< bus write data
-   input      [  4-1: 0] sys_sel_i       ,  //!< bus write byte select
-   input                 sys_wen_i       ,  //!< bus write enable
-   input                 sys_ren_i       ,  //!< bus read enable
-   output reg [ 32-1: 0] sys_rdata_o     ,  //!< bus read data
-   output reg            sys_err_o       ,  //!< bus error indicator
+   input                 sys_clk_i , //!< bus clock
+   input                 sys_rstn_i , //!< bus reset - active low
+   input [ 32-1: 0]      sys_addr_i , //!< bus address
+   input [ 32-1: 0]      sys_wdata_i , //!< bus write data
+   input [ 4-1: 0]       sys_sel_i , //!< bus write byte select
+   input                 sys_wen_i , //!< bus write enable
+   input                 sys_ren_i , //!< bus read enable
+   output reg [ 32-1: 0] sys_rdata_o , //!< bus read data
+   output reg            sys_err_o , //!< bus error indicator
    output reg            sys_ack_o          //!< bus acknowledge signal
+
+ 
 );
 
 
@@ -98,12 +103,16 @@ reg   [ 24-1: 0] dac_b_r      ;
 reg   [ 24-1: 0] dac_c_r      ;
 reg   [ 24-1: 0] dac_d_r      ;
 
+reg [ 12-1: 0] xadc_a_r     ;
+reg [ 12-1: 0] xadc_b_r     ;
+   
 always @(posedge sys_clk_i) begin
    if (sys_rstn_i == 1'b0) begin
       dac_a_r     <= 24'h0F_0000 ;
       dac_b_r     <= 24'h4E_0000 ;
       dac_c_r     <= 24'h75_0000 ;
       dac_d_r     <= 24'h9C_0000 ;
+      
    end
    else begin
       if (sys_wen_i) begin
@@ -154,6 +163,9 @@ assign dac_b_o = dac_b_r ;
 assign dac_c_o = dac_c_r ;
 assign dac_d_o = dac_d_r ;
 
+assign xadc_a_o = xadc_a_r;
+assign xadc_b_o = xadc_b_r;
+   
 
 
 
@@ -270,7 +282,11 @@ always @(posedge clk_i) begin
    end
 end
 
-
+   always @(posedge sys_clk_i) begin
+      xadc_a_r  <= adc_a_r;
+      xadc_b_r  <= adc_b_r;
+   end
+   
 
 
 

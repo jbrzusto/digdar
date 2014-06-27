@@ -1,0 +1,32 @@
+Changes to make to implement marine radar digitizer based on RP scope
+   application:
+
+worker.c: worker thread sleeps are too long:
+
+- polling sleep is currently 1 ms; should be 200 us to accomodate PRFs
+   up to ~ 4kHz
+
+- after acquisition of single buffer (one trigger's worth), sleep is
+   10ms.  Change this to 200 us to accomodate PRFs up to 4kHz
+
+- why is decimation etc. being done in C code rather than on the FPGA?
+  Basic decimation is done on the FPGA, from raw clock to power-of-two
+  decimated clock, with our without averaging.  Further decimation,
+  from the fixed 16K FPGA decimated sample buffers to the desired
+  buffer size for output to the web browser, is done in C.
+
+- low speed ADC values are being pushed out to memory just like high-speed values are.  Instead, it would be nice to pack the low-speed
+  values into the upper 16-bits of each 32-bit high-speed value,
+  for the scope application.
+  For actual radar digitizing, we'd like counts of pulses in the low
+  speed ADCs to appear in these locations instead.
+  
+- can we get a custom fpga image to load?
+  Loading fpga.bit is commented out in
+   Bazaar/nginx/ngx_ext_modules/ngx_http_rp_module/src/rp_bazaar_cmd.c 
+   YES: in redpitaya/FPGA/release1/fpga/
+   do 'make image' to make boot.bin; copy boot.bin to RP using:
+    rw (from RP shell)
+    scp boot.bin root@rp:/opt (from host shell)
+    ro (from RP shell)
+

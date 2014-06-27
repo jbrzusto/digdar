@@ -298,6 +298,9 @@ wire  [ 24-1: 0] dac_pwm_b   ;
 wire  [ 24-1: 0] dac_pwm_c   ;
 wire  [ 24-1: 0] dac_pwm_d   ;
 
+wire [ 12-1: 0] xadc_a      ;  // to store most recent value from slow ADCs
+wire [ 12-1: 0] xadc_b      ;
+   
 red_pitaya_analog i_analog
 (
   // ADC IC
@@ -485,6 +488,9 @@ red_pitaya_scope i_scope
   .trig_ext_i      (  exp_p_in[0]                ),  // external trigger
   .trig_asg_i      (  trig_asg_out               ),  // ASG trigger
 
+  .xadc_a          (  xadc_a                     ),  // slow channel 1
+  .xadc_b          (  xadc_b                     ),  // slow channel 2
+ 
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -632,6 +638,10 @@ red_pitaya_ams i_ams
   .dac_c_o         (  dac_pwm_c                  ),
   .dac_d_o         (  dac_pwm_d                  ),
 
+ 
+  .xadc_a_o        (  xadc_a                     ),  // latest value from slow ADC a
+  .xadc_b_o        (  xadc_b                     ),  // latest value from slow ADC b
+
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -643,6 +653,7 @@ red_pitaya_ams i_ams
   .sys_rdata_o     (  sys_rdata[ 4*32+31: 4*32]  ),  // read data
   .sys_err_o       (  sys_err[4]                 ),  // error indicator
   .sys_ack_o       (  sys_ack[4]                 )   // acknowledge signal
+
 );
 
 

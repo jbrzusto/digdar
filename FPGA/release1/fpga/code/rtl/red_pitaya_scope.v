@@ -61,7 +61,9 @@ module red_pitaya_scope
    input                 trig_ext_i      ,  //!< external trigger
    input                 trig_asg_i      ,  //!< ASG trigger
 
-  
+   input      [ 12-1: 0] xadc_a          ,  //!< latest value from slow ADC 0  
+   input      [ 12-1: 0] xadc_b          ,  //!< latest value from slow ADC 1
+
    // System bus
    input                 sys_clk_i       ,  //!< bus clock
    input                 sys_rstn_i      ,  //!< bus reset - active low
@@ -103,7 +105,6 @@ reg  [ 18-1: 0] set_b_filt_aa  ;
 reg  [ 25-1: 0] set_b_filt_bb  ;
 reg  [ 25-1: 0] set_b_filt_kk  ;
 reg  [ 25-1: 0] set_b_filt_pp  ;
-
 
 assign adc_a_filt_in = adc_a_i ;
 assign adc_b_filt_in = adc_b_i ;
@@ -202,14 +203,20 @@ end
 localparam RSZ = 14 ;  // RAM size 2^RSZ
 
 
-reg   [  14-1: 0] adc_a_buf [0:(1<<RSZ)-1] ;
-reg   [  14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
-reg   [  14-1: 0] adc_a_rd      ;
-reg   [  14-1: 0] adc_b_rd      ;
+reg   [14-1: 0] adc_a_buf [0:(1<<RSZ)-1] ;
+reg   [14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
+reg   [14-1: 0] adc_a_rd       ;
+reg   [14-1: 0] adc_b_rd       ;
+reg   [12-1: 0] xadc_a_buf [0:(1<<RSZ)-1] ;
+reg   [12-1: 0] xadc_b_buf [0:(1<<RSZ)-1] ;
+reg   [12-1: 0] xadc_a_rd       ;
+reg   [12-1: 0] xadc_b_rd       ;
 reg   [ RSZ-1: 0] adc_wp        ;
 reg   [ RSZ-1: 0] adc_raddr     ;
 reg   [ RSZ-1: 0] adc_a_raddr   ;
 reg   [ RSZ-1: 0] adc_b_raddr   ;
+reg   [ RSZ-1: 0] xadc_a_raddr  ;
+reg   [ RSZ-1: 0] xadc_b_raddr  ;
 reg   [   4-1: 0] adc_rval      ;
 wire              adc_rd_dv     ;
 reg               adc_we        ;
@@ -272,6 +279,8 @@ always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
       adc_a_buf[adc_wp] <= adc_a_dat ;
       adc_b_buf[adc_wp] <= adc_b_dat ;
+      xadc_a_buf[adc_wp] <= xadc_a ;
+      xadc_b_buf[adc_wp] <= xadc_b ;
    end
 end
 
@@ -288,8 +297,12 @@ always @(posedge adc_clk_i) begin
    adc_raddr   <= addr[RSZ+1:2] ; // address synchronous to clock
    adc_a_raddr <= adc_raddr     ; // double register 
    adc_b_raddr <= adc_raddr     ; // otherwise memory corruption at reading
+   xadc_a_raddr <= adc_a_raddr     ; // double register 
+   xadc_b_raddr <= adc_b_raddr     ; // otherwise memory corruption at reading
    adc_a_rd    <= adc_a_buf[adc_a_raddr] ;
    adc_b_rd    <= adc_b_buf[adc_b_raddr] ;
+   xadc_a_rd    <= xadc_a_buf[xadc_a_raddr] ;
+   xadc_b_rd    <= xadc_b_buf[xadc_b_raddr] ;
 end
 
 
@@ -532,6 +545,7 @@ always @(posedge adc_clk_i) begin
       set_b_filt_bb <=  25'h0      ;
       set_b_filt_kk <=  25'hFFFFFF ;
       set_b_filt_pp <=  25'h0      ;
+      
    end
    else begin
       if (wen) begin
@@ -587,8 +601,11 @@ always @(*) begin
      20'h00048 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_kk}      ; end
      20'h0004C : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_pp}      ; end
 
-     20'h1???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0,adc_a_rd}              ; end
-     20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0,adc_b_rd}              ; end
+     20'h1???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_a_rd}             ; end
+     20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
+
+     20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}            ; end
+     20'h4???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_b_rd}            ; end
 
        default : begin ack <= 1'b1;          rdata <=  32'h0                              ; end
    endcase
