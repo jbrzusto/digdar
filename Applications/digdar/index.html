@@ -1006,10 +1006,11 @@
     
     btn.data('checked', checked).toggleClass('btn-default btn-primary');
     
+    // JMB: the following doesn't seem very important and isn't intuitive                                                 
     // At least one button must be checked, so that at least one graph will be visible.
-//    if(! checked) {
-//      other_btn.data('checked', true).removeClass('btn-default').addClass('btn-primary');
-//    }
+    //    if(! checked) {
+    //      other_btn.data('checked', true).removeClass('btn-default').addClass('btn-primary');
+    //    }
     redrawPlot();
   }
   
@@ -1561,9 +1562,8 @@
                   <label for="trig_source" class="col-xs-4 control-label">Source:</label>
                   <div class="col-xs-8">
                     <select id="trig_source" class="form-control">
-                      <option value="0">Channel 1</option>
-                      <option value="1">Channel 2</option>
-                      <option value="2">External</option>
+                      <option value="0">Video</option>
+                      <option value="1">Trigger</option>
                     </select>
                   </div>
                 </div>
@@ -1571,9 +1571,9 @@
                   <label for="trig_mode" class="col-xs-4 control-label">Mode:</label>
                   <div class="col-xs-8">
                     <select id="trig_mode" class="form-control">
-                      <option value="0">Auto</option>
-                      <option value="1">Normal</option>
-                      <option value="2">Single</option>
+                      <option value="0">Plot continuously</option>
+                      <option value="1">Plot at trigger pulses</option>
+                      <option value="2">Plot one trigger pulse</option>
                     </select>
                   </div>
                 </div>
@@ -1594,7 +1594,7 @@
                       <button class="btn btn-primary btn-lg" type="button"><span class="glyphicon glyphicon-ok-circle"></span></button>
                     </span>
                   </div>
-                  <div id="trig_lev_units" class="col-xs-3" style="padding: 7px 0 0;">V</div>
+                  <div id="trig_lev_units" class="col-xs-3" style="padding: 7px 0 0;">(rel. units)</div>
                 </div>
               </form>
               <div class="row">
@@ -1624,7 +1624,7 @@
                   <div class="col-xs-8 col-sm-9">
                     <div class="row">
                       <div class="col-xs-6 text-center">
-                        <div class="group-label" style="padding-bottom: 10px;">X axis</div>
+                        <div class="group-label" style="padding-bottom: 10px;">Time axis</div>
                         <div class="btn-group" style="margin-bottom: -3px;">
                           <button id="range_x_minus" type="button" class="btn btn-primary btn-lg range-btn-left">
                             <span class="glyphicon glyphicon-minus"></span>
@@ -1638,7 +1638,7 @@
                         </div>
                       </div>
                       <div class="col-xs-6 text-center">
-                        <div class="group-label" style="padding-bottom: 10px;">Y axis</div>
+                        <div class="group-label" style="padding-bottom: 10px;">Signal axis</div>
                         <div class="btn-group" style="margin-bottom: -3px;">
                           <button id="range_y_minus" type="button" class="btn btn-primary btn-lg range-btn-left">
                             <span class="glyphicon glyphicon-minus"></span>
@@ -1741,7 +1741,7 @@
       </div>
     </div>
     <div class="footer clearfix">
-      <p class="pull-right" style="margin: 4px 0 0">&copy; 2014 - Red Pitaya<br>&copy; 2014 - John Brzustowski</p>
+      <p class="pull-right" style="margin: 4px 0 0">&copy; 2014 - Red Pitaya<br>portions &copy; 2014 - John Brzustowski</p>
     </div>
   </div>
   <div id="modal_err" class="modal" tabindex="-1" role="dialog" aria-labelledby="modal_err_label" aria-hidden="true">
