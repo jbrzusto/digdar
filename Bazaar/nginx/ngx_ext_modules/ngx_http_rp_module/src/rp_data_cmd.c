@@ -26,7 +26,7 @@ static float **rp_signals = NULL;
 static int     rp_signals_dirty = 0;
 
 #define TRACE(args...) fprintf(stderr, args)
-
+#define NUM_DATASETS 4
 
 /*----------------------------------------------------------------------------*/
 /* request private context, used to shared data between different callback functions
@@ -413,14 +413,15 @@ int rp_data_get_params(ngx_http_request_t *r, cJSON **json_root)
 int rp_data_get_signals(ngx_http_request_t *r, cJSON **json_root)
 {
     int rp_sig_num, rp_sig_len, ret_val;
-    cJSON *data_root, *sig_root, *d1, *d2, *g1;
+    cJSON *data_root, *sig_root, /* *d1, */ *d2, *g1;
     /* TODO: Make it configurable */
     int retries = 200; /* Approx in [ms] */
+    int i;
 
     if(rp_signals == NULL) {
         int i;
-        rp_signals = (float **)malloc(3 * sizeof(float *));
-        for(i = 0; i < 3; i++) {
+        rp_signals = (float **)malloc((NUM_DATASETS + 1) * sizeof(float *));
+        for(i = 0; i < NUM_DATASETS + 1; i++) {
             rp_signals[i] = (float *)malloc(2048 * sizeof(float));
         }
     }
@@ -459,19 +460,27 @@ int rp_data_get_signals(ngx_http_request_t *r, cJSON **json_root)
     cJSON_AddItemToObject(data_root, "g1",
                           g1=cJSON_CreateArray(r->pool), r->pool);
 
-    cJSON_AddItemToObject(g1, "g1", 
-                          sig_root=cJSON_CreateObject(r->pool), r->pool);
-    cJSON_AddItemToObject(sig_root, "data",
-                   d1=cJSON_Create2dFloatArray(&rp_signals[0][0], &rp_signals[1][0],
-                                               rp_sig_len, r->pool),
-                          r->pool);
-    cJSON_AddItemToObject(g1, "g1", 
-                          sig_root=cJSON_CreateObject(r->pool), r->pool);
-    cJSON_AddItemToObject(sig_root, "data",
-                   d2=cJSON_Create2dFloatArray(&rp_signals[0][0], &rp_signals[2][0],
-                                               rp_sig_len, r->pool),
-                          r->pool);
+    /* cJSON_AddItemToObject(g1, "g1",  */
+    /*                       sig_root=cJSON_CreateObject(r->pool), r->pool); */
+    /* cJSON_AddItemToObject(sig_root, "data", */
+    /*                d1=cJSON_Create2dFloatArray(&rp_signals[0][0], &rp_signals[1][0], */
+    /*                                            rp_sig_len, r->pool), */
+    /*                       r->pool); */
+    /* cJSON_AddItemToObject(g1, "g1",  */
+    /*                       sig_root=cJSON_CreateObject(r->pool), r->pool); */
+    /* cJSON_AddItemToObject(sig_root, "data", */
+    /*                d2=cJSON_Create2dFloatArray(&rp_signals[0][0], &rp_signals[2][0], */
+    /*                                            rp_sig_len, r->pool), */
+    /*                       r->pool); */
 
+    for (i = 0; i < NUM_DATASETS; ++i) {
+      cJSON_AddItemToObject(g1, "g1", 
+                            sig_root=cJSON_CreateObject(r->pool), r->pool);
+      cJSON_AddItemToObject(sig_root, "data",
+                            d2=cJSON_Create2dFloatArray(&rp_signals[0][0], &rp_signals[i+1][0],
+                                                        rp_sig_len, r->pool),
+                          r->pool);
+    }
     return ret_val;
 }
 
