@@ -33,6 +33,7 @@ MONITOR_DIR=Test/monitor
 GENERATE_DIR=Test/generate
 ACQUIRE_DIR=Test/acquire
 CALIB_DIR=Test/calib
+DIGDAR_DIR=Test/digdar
 DISCOVERY_DIR=OS/discovery
 ECOSYSTEM_DIR=Applications/ecosystem
 
@@ -50,6 +51,7 @@ MONITOR=$(BUILD)/bin/monitor
 GENERATE=$(BUILD)/bin/generate
 ACQUIRE=$(BUILD)/bin/acquire
 CALIB=$(BUILD)/bin/calib
+DIGDAR=$(BUILD)/bin/digdar
 DISCOVERY=$(BUILD)/sbin/discovery
 ECOSYSTEM=$(BUILD)/www/apps/info/info.json
 
