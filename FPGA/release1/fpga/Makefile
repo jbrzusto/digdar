@@ -7,7 +7,8 @@
 #   1. FPGA bit file & XSDC configuration.
 #   2. XSDK products.
 #   3. Booting image & device-tree.
-#
+#   4. installs image as /opt/boot.bin.digdar and a copy as /opt/boot.bin
+#      on an attached rp, using ssh to root@rp
 
 
 .PHONY: all clean image
@@ -23,6 +24,10 @@ SDK_DIR=$(FPGA_TOOL)/red_pitaya.sdk/SDK/SDK_Export
 all: fpga sw_package image
 	echo ' \n'
 
+install: image
+	ssh root@rp rw
+	scp image/out/boot.bin root@rp:/opt/boot.bin.digdar
+	ssh root@rp "cp -f /opt/boot.bin.digdar /opt/boot.bin; ro"
 
 #### CLEAN
 clean:
