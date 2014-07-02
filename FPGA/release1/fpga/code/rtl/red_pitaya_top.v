@@ -712,9 +712,8 @@ red_pitaya_daisy i_daisy
 
 red_pitaya_digdar i_digdar
 (
-  .clk_i           (  adc_clk                    ),  // clock
-  .rstn_i          (  adc_rstn                   ),  // reset - active low
-
+  .adc_clk_i       (  adc_clk                    ),  // clock
+  .adc_rstn_i      (  adc_rstn                   ),  // clock
  
   .xadc_a_i        (  xadc_a                     ),  // latest value from slow ADC a
   .xadc_b_i        (  xadc_b                     ),  // latest value from slow ADC b

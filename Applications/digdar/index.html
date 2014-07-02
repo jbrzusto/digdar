@@ -565,7 +565,7 @@
         
         if(params.local) {
           // Disable trigger level input if trigger source is External or mode is not Normal
-          if(params.original.trig_mode != 1 || params.original.trig_source == 2) {
+          if(params.original.trig_mode == 0 || params.original.trig_source == 2) {
             $('#trig_level').prop('disabled', true);
             if($('#trig_level').is(':focus')) {
               $('#trig_level').blur();
@@ -1553,7 +1553,7 @@
           <div class="panel-heading">
             <h4 class="panel-title">
               <a data-toggle="collapse" href="#trigger">
-                Trigger
+                Digitizing Trigger
               </a>
             </h4>
           </div>
@@ -1564,8 +1564,8 @@
                   <label for="trig_source" class="col-xs-4 control-label">Source:</label>
                   <div class="col-xs-8">
                     <select id="trig_source" class="form-control">
-                      <option value="0">Video</option>
-                      <option value="1" selected>Trigger</option>
+                      <option value="0">Radar Video Line</option>
+                      <option value="1" selected>Radar Trigger Line</option>
                     </select>
                   </div>
                 </div>
@@ -1574,8 +1574,8 @@
                   <div class="col-xs-8">
                     <select id="trig_mode" class="form-control">
                       <option value="0">Plot continuously</option>
-                      <option value="1">Plot at trigger pulses</option>
-                      <option value="2">Plot one trigger pulse</option>
+                      <option value="1">Plot continuously at trigger pulses</option>
+                      <option value="2">Plot at single trigger pulse</option>
                     </select>
                   </div>
                 </div>
@@ -1603,7 +1603,7 @@
                 <div class="col-xs-4"> </div>
                 <div class="col-xs-5">
                   <button id="btn_single" class="btn btn-primary" onclick="singleUpdate()" disabled>
-                    <span class="glyphicon glyphicon-step-forward"></span> Single
+                    <span class="glyphicon glyphicon-step-forward"></span> Plot Single Pulse
                   </button>
                 </div>
               </div>

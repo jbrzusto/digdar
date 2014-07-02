@@ -49,7 +49,7 @@
 
 `define TS_DELAYING             3'd6  // threshold crossed; delaying before triggering
 
-module red_pitaya_trigger_gen 
+module trigger_gen 
   ( input clock,
     input reset,
     input enable,
