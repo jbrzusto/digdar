@@ -1,7 +1,7 @@
 /** -*- verilog -*-
  *
  * @brief Red Pitaya trigger generation module.  It detects and counts trigger
- *        pulses in a digitized signal.
+ *        pulses in a digitized signal.  Input signal and thresholds are signed.
  *
  * @Author John Brzustowski
  *
@@ -53,7 +53,7 @@ module trigger_gen
   ( input clock,
     input reset,
     input enable,
-    input [width-1:0] signal,
+    input [width-1:0] signal_in,
     input [width-1:0] thresh_relax,
     input [width-1:0] thresh_excite,
     input [delay_width-1:0] delay,
@@ -73,121 +73,125 @@ module trigger_gen
    reg [width-1:0] 		   sig_smoothed; // possibly smoothed version of signal_in
    reg [age_width-1:0] 		   relax_age;    // how long since trigger crossed relaxation threshold?
    reg [age_width-1:0]             age;          // number of clock ticks since reset or assertion of trigger
-                           
+   
    // smooth the signal with an IIR filter:  smooth[i+1] <= (7 * smooth[i] + value[i+1]) / 8
    // FIXME: make the weighting a control parameter, instead of hardwiring 7/8, 1/8.
+   // Note the sign extension, as we treat signal as signed.
 
-   wire [3 + width - 1:0] 	   smoother = {{sig_smoothed, 3'b0} - {3'b0, sig_smoothed} + {3'b0, signal}};
+   reg [width + 3 - 1: 0]          smoother;
    
    always @(posedge clock)
      if (reset | ~enable)
        begin
-	  if (thresh_relax < thresh_excite)
-	    state <= #1 `TS_M1_WAITING_RELAX;
-	  else if (thresh_relax > thresh_excite)
-	    state <= #1 `TS_M2_WAITING_RELAX;
+	  if ($signed(thresh_relax) < $signed(thresh_excite))
+	    state <=  `TS_M1_WAITING_RELAX;
+	  else if ($signed(thresh_relax) > $signed(thresh_excite))
+	    state <=  `TS_M2_WAITING_RELAX;
 	  else
-	    state <= #1 `TS_M3_WAITING_RELAX;
+	    state <=  `TS_M3_WAITING_RELAX;
 	  trigger <=  1'b0;
-	  counter <= #1 1'b0;
-	  sig_smoothed <= #1 signal;
-	  age <= #1 1'b0;
-	  relax_age <= #1 1'b0;
+	  counter <=  1'b0;
+	  sig_smoothed <=  signal_in;
+          smoother <= {signal_in, 3'b0};
+	  age <=  1'b0;
+	  relax_age <=  1'b0;
        end
      else
        begin	  
-	  age = age + 1'b1;              // NB: blocking assign
-	  relax_age =  relax_age + 1'b1; // NB: blocking assign 
-	  
-	  sig_smoothed <= #1 do_smoothing ? smoother[3 + width - 1 : 3] : signal;
+	  age <= age + 1'b1;              // NB: blocking assign
+	  relax_age <=  relax_age + 1'b1; // NB: blocking assign 
+
+          smoother[width + 3 - 1: 0] <= {sig_smoothed[width-1:0], 3'b0} - {{3{sig_smoothed[width - 1]}}, sig_smoothed[width-1:0]} + {{3{signal_in[width - 1]}}, signal_in[width - 1:0]};
+
+	  sig_smoothed <=  do_smoothing ? smoother[3 + width - 1 : 3] : signal_in;
 	  
 	  case (state)
 	    `TS_M1_WAITING_RELAX:
 	      begin
-		 trigger <= #1 1'b0;
-		 if (age >= latency && sig_smoothed <= thresh_relax)
+		 trigger <=  1'b0;
+		 if (age >= latency && $signed(sig_smoothed) <= $signed(thresh_relax))
 		   begin
-		      state <= #1 `TS_M1_WAITING_EXCITE;
-		      relax_age <= #1 1'b0;
+		      state <=  `TS_M1_WAITING_EXCITE;
+		      relax_age <=  1'b0;
 		   end
 	      end
 	    
 	    `TS_M1_WAITING_EXCITE:
 	      begin
-		 if (relax_age >= latency && sig_smoothed >= thresh_excite)
+		 if (relax_age >= latency && $signed(sig_smoothed) >= $signed(thresh_excite))
 		   begin
-		      age <= #1 1'b0;
-		      counter <= #1 counter + 1'b1;
+		      age <=  1'b0;
+		      counter <=  counter + 1'b1;
 		      if (delay == 0)
 			begin
-			   state <= #1 `TS_M1_WAITING_RELAX;
-			   trigger <= #1 1'b1;
+			   state <=  `TS_M1_WAITING_RELAX;
+			   trigger <=  1'b1;
 			end
 		      else
 			begin
-			   state <= #1 `TS_DELAYING;
-			   delay_counter <= #1 delay;
-			   trigger <= #1 1'b0; // redundant
+			   state <=  `TS_DELAYING;
+			   delay_counter <=  delay;
+			   trigger <=  1'b0; // redundant
 			end
 		   end
 	      end
 	    
 	    `TS_M2_WAITING_RELAX:
 	      begin
-		 trigger <= #1 1'b0;
-		 if (age >= latency && sig_smoothed >= thresh_relax)
+		 trigger <=  1'b0;
+		 if (age >= latency && $signed(sig_smoothed) >= $signed(thresh_relax))
 		   begin
-		      state <= #1 `TS_M2_WAITING_EXCITE;
-		      relax_age <= #1 1'b0;
+		      state <=  `TS_M2_WAITING_EXCITE;
+		      relax_age <=  1'b0;
 		   end
 	      end
 	    
 	    `TS_M2_WAITING_EXCITE:
 	      begin
-		 if (relax_age >= latency && sig_smoothed <= thresh_excite)
+		 if (relax_age >= latency && $signed(sig_smoothed) <= $signed(thresh_excite))
 		   begin
-		      age <= #1 1'b0;
-		      counter <= #1 counter + 1'b1;
+		      age <=  1'b0;
+		      counter <=  counter + 1'b1;
 		      if (delay == 0)
 			begin
-			   state <= #1 `TS_M2_WAITING_RELAX;
-			   trigger <= #1 1'b1;
+			   state <=  `TS_M2_WAITING_RELAX;
+			   trigger <=  1'b1;
 			end
 		      else
 			begin
-			   state <= #1 `TS_DELAYING;
-			   delay_counter <= #1 delay;
-			   trigger <= #1 1'b0; // redundant
+			   state <=  `TS_DELAYING;
+			   delay_counter <=  delay;
+			   trigger <=  1'b0; // redundant
 			end
 		   end
 	      end
 	    
 	    `TS_M3_WAITING_RELAX:
 	      begin
-		 trigger <= #1 1'b0;
-		 if (age >= latency && sig_smoothed < thresh_relax)
+		 trigger <=  1'b0;
+		 if (age >= latency && $signed(sig_smoothed) < $signed(thresh_relax))
 		   begin
-		      state <= #1 `TS_M3_WAITING_EXCITE;
-		      relax_age <= #1 1'b0;
+		      state <=  `TS_M3_WAITING_EXCITE;
+		      relax_age <=  1'b0;
 		   end
 	      end
 	    
 	    `TS_M3_WAITING_EXCITE:
 	      begin
-		 if (relax_age >= latency && sig_smoothed > thresh_excite)
+		 if (relax_age >= latency && $signed(sig_smoothed) > $signed(thresh_excite))
 		   begin
-		      age <= #1 1'b0;
-		      counter <= #1 counter + 1'b1;
+		      age <=  1'b0;
+		      counter <=  counter + 1'b1;
 		      if (delay == 0)
 			begin
-			   state <= #1 `TS_M3_WAITING_RELAX;
-			   trigger <= #1 1'b1;
+			   state <=  `TS_M3_WAITING_RELAX;
+			   trigger <=  1'b1;
 			end
 		      else
 			begin
-			   state <= #1 `TS_DELAYING;
-			   delay_counter <= #1 delay;
-			   trigger <= #1 1'b0; // redundant
+			   state <=  `TS_DELAYING;
+			   delay_counter <=  delay;
+			   trigger <=  1'b0; // redundant
 			end
 		   end
 	      end
@@ -195,18 +199,18 @@ module trigger_gen
 	    `TS_DELAYING:
 	      if (delay_counter <= 1) // really, should never be zero here.
 		begin
-		   if (thresh_relax < thresh_excite)
-		     state <= #1 `TS_M1_WAITING_RELAX;
-		   else if (thresh_relax > thresh_excite)
-		     state <= #1 `TS_M2_WAITING_RELAX;
+		   if ($signed(thresh_relax) < $signed(thresh_excite))
+		     state <=  `TS_M1_WAITING_RELAX;
+		   else if ($signed(thresh_relax) > $signed(thresh_excite))
+		     state <=  `TS_M2_WAITING_RELAX;
 		   else
-		     state <= #1 `TS_M3_WAITING_RELAX;
-		   counter <= #1 counter + 1'b1;
-		   trigger <= #1 1'b1;
+		     state <=  `TS_M3_WAITING_RELAX;
+		   counter <=  counter + 1'b1;
+		   trigger <=  1'b1;
 		end
 	      else
 		begin
-		   delay_counter <= #1 delay_counter - 1'b1;
+		   delay_counter <= delay_counter - 1'b1;
 		end
 	  endcase // case (state)
        end

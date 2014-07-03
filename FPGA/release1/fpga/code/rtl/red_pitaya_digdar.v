@@ -101,15 +101,15 @@ reg  [32-1: 0] prev_acp_count     ;
 
    trigger_gen #( .width(12),
                              .counter_width(32),
-                             .do_smoothing(0)
+                             .do_smoothing(1)
                              ) trigger_gen_acp  // not really a trigger; we're just counting these pulses
      (
       .clock(adc_clk_i), 
       .reset(! adc_rstn_i),  // active low
       .enable(1'b1),
-      .signal({~xadc_a_i[11], xadc_a_i[11-1:0]}), // convert to unsigned form
-      .thresh_excite({~acp_thresh_excite[11], acp_thresh_excite[11-1:0]}),
-      .thresh_relax({~acp_thresh_relax[11], acp_thresh_relax[11-1:0]}),
+      .signal_in(xadc_a_i), // signed
+      .thresh_excite(acp_thresh_excite), // signed
+      .thresh_relax(acp_thresh_relax), //signed
       .delay(0), 
       .latency(acp_latency),
       .trigger(acp_trigger),
@@ -118,15 +118,15 @@ reg  [32-1: 0] prev_acp_count     ;
    
    trigger_gen #( .width(12),
                              .counter_width(32),
-                             .do_smoothing(0)
+                             .do_smoothing(1)
                              ) trigger_gen_arp  // not really a trigger; we're just counting these pulses
      (
       .clock(adc_clk_i), 
       .reset(! adc_rstn_i), // active low
       .enable(1'b1),
-      .signal({~xadc_b_i[11], xadc_b_i[11-1:0]}), 
-      .thresh_excite({~arp_thresh_excite[11], arp_thresh_excite[11-1:0]}),
-      .thresh_relax({~arp_thresh_relax[11], arp_thresh_relax[11-1:0]}),
+      .signal_in(xadc_b_i), // signed
+      .thresh_excite(arp_thresh_excite), // signed
+      .thresh_relax(arp_thresh_relax), // signed
       .delay(0), 
       .latency(arp_latency),
       .trigger(arp_trigger),
@@ -153,7 +153,7 @@ reg             ack          ;
 
    always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
-      clock_counter              <= 64'h1234567887654321;
+      clock_counter              <= 64'h0;
 
       acp_clock           <= 64'h0;
       acp_prev_clock      <= 64'h0;
