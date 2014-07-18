@@ -98,8 +98,8 @@ module trigger_gen
        end
      else
        begin	  
-	  age <= age + 1'b1;              // NB: blocking assign
-	  relax_age <=  relax_age + 1'b1; // NB: blocking assign 
+	  age <= age + 1'b1;
+	  relax_age <=  relax_age + 1'b1;
 
           smoother[width + 3 - 1: 0] <= {sig_smoothed[width-1:0], 3'b0} - {{3{sig_smoothed[width - 1]}}, sig_smoothed[width-1:0]} + {{3{signal_in[width - 1]}}, signal_in[width - 1:0]};
 

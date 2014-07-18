@@ -50,8 +50,10 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
     { /* trig_source:
        *    0 - ChA
        *    1 - ChB
-       *    2 - ext.    */
-        "trig_source", 0, 1, 0,         0,         2 },
+       *    2 - ext.
+       *    3 - digdar */
+
+        "trig_source", 0, 1, 0,         0,         3 },
     { /* trig_edge:
        *    0 - rising
        *    1 - falling */

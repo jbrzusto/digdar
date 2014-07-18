@@ -35,7 +35,7 @@
 #define OSC_FPGA_CONF_RST_BIT  2
 
 /** Bit mask in the trigger_source register for depicting the trigger source type. */
-#define OSC_FPGA_TRIG_SRC_MASK 0x00000007
+#define OSC_FPGA_TRIG_SRC_MASK 0x0000000f
 /** Bit mask in the cha_thr register for depicting trigger threshold on channel A. */
 #define OSC_FPGA_CHA_THR_MASK  0x00003fff
 /** Bit mask in the cha_thr register for depicting trigger threshold on channel B. */
@@ -71,7 +71,7 @@ typedef struct osc_fpga_reg_mem_s {
     uint32_t conf;
 
     /** @brief  Trigger source:
-     * bits [ 2 : 0] - trigger source:
+     * bits [ 3 : 0] - trigger source:
      *   1 - trig immediately
      *   2 - ChA positive edge
      *   3 - ChA negative edge
@@ -79,7 +79,10 @@ typedef struct osc_fpga_reg_mem_s {
      *   5 - ChB negative edge
      *   6 - External trigger 0
      *   7 - External trigger 1 
-     * bits [31 : 3] -reserved
+     *   8 - ASG positive edge
+     *   9 - ASG negative edge
+     *  10 - digdar counted trigger pulse
+     * bits [31 : 4] -reserved
      */
     uint32_t trig_source;
 

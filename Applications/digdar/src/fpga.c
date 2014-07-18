@@ -169,7 +169,7 @@ int osc_fpga_exit(void)
  * FPGA module
  *
  * @param[in] trig_imm           nonzero if acquisition is applied immediately, zero if acquisition is trigger dependent
- * @param[in] trig_source        0 ChannelA, 1 ChannelB, 2 External
+ * @param[in] trig_source        0 ChannelA, 1 ChannelB, 2 External, 3 digdar
  * @param[in] trig_edge          0 Positive, 1 Negative edge
  * @param[in] trig_delay         Number of signal data atoms to be captured after the trigger
  * @param[in] trig_level         Trigger threshold level. expressed in [V]
@@ -425,7 +425,7 @@ int osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig)
  * becomes active
  *
  * @param[in] trig_imm     nonzero if acquisition is applied immediately, zero if acquisition is trigger dependent
- * @param[in] trig_source  0 ChannelA, 1 ChannelB, 2 External
+ * @param[in] trig_source  0 ChannelA, 1 ChannelB, 2 External, 3 digdar
  * @param[in] trig_edge    0 Positive, 1 Negative edge
  *
  * @retval -1 failure, indicating invalid arguments are specified
@@ -460,6 +460,10 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
         else
             fpga_trig_source = 7;
         break;
+
+    case 3: /* Digdar */
+      fpga_trig_source = 10;
+      break;
 
     default:
         /* Error */

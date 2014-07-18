@@ -477,7 +477,10 @@ endgenerate
 //  Oscilloscope application
 
 wire trig_asg_out ;
-
+wire radar_trig ;
+wire adc_ready ;
+   
+   
 red_pitaya_scope i_scope
 (
   // ADC
@@ -487,10 +490,13 @@ red_pitaya_scope i_scope
   .adc_rstn_i      (  adc_rstn                   ),  // reset - active low
   .trig_ext_i      (  exp_p_in[0]                ),  // external trigger
   .trig_asg_i      (  trig_asg_out               ),  // ASG trigger
-
+  .radar_trig_i    (  radar_trig                 ),  // radar trigger (possibly delayed trigger from channel B)
+ 
   .xadc_a          (  xadc_a                     ),  // slow channel 1
   .xadc_b          (  xadc_b                     ),  // slow channel 2
- 
+
+  .adc_ready_o     (  adc_ready                  ),  // asserted while ADC armed but not triggered 
+
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -714,10 +720,15 @@ red_pitaya_digdar i_digdar
 (
   .adc_clk_i       (  adc_clk                    ),  // clock
   .adc_rstn_i      (  adc_rstn                   ),  // clock
- 
+
+  .adc_b_i         (  adc_b                      ),  // fast ADC channel B (for generating trigger)
   .xadc_a_i        (  xadc_a                     ),  // latest value from slow ADC a
   .xadc_b_i        (  xadc_b                     ),  // latest value from slow ADC b
 
+  .adc_ready_i     (  adc_ready                  ),  // true when ADC armed but not yet triggered
+ 
+  .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
+ 
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low

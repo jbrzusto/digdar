@@ -64,6 +64,10 @@ module red_pitaya_scope
    input      [ 12-1: 0] xadc_a          ,  //!< latest value from slow ADC 0  
    input      [ 12-1: 0] xadc_b          ,  //!< latest value from slow ADC 1
 
+   input                 radar_trig_i    ,  //!< true for one cycle at start of radar trigger pulse
+
+   output                adc_ready_o     ,  //!< true while armed but not yet triggered
+
    // System bus
    input                 sys_clk_i       ,  //!< bus clock
    input                 sys_rstn_i      ,  //!< bus reset - active low
@@ -76,8 +80,7 @@ module red_pitaya_scope
    output                sys_err_o       ,  //!< bus error indicator
    output                sys_ack_o          //!< bus acknowledge signal
 );
-
-
+   
 wire [ 32-1: 0] addr         ;
 wire [ 32-1: 0] wdata        ;
 wire            wen          ;
@@ -228,6 +231,7 @@ reg   [  32-1: 0] set_dly       ;
 reg   [  32-1: 0] adc_dly_cnt   ;
 reg               adc_dly_do    ;
 
+assign adc_ready_o = adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
 
 // Write
 always @(posedge adc_clk_i) begin
@@ -353,6 +357,8 @@ always @(posedge adc_clk_i) begin
           4'd7 : adc_trig <= ext_trig_n    ; // external - falling edge
           4'd8 : adc_trig <= asg_trig_p    ; // ASG - rising edge
           4'd9 : adc_trig <= asg_trig_n    ; // ASG - falling edge
+          4'd10: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
+         
        default : adc_trig <= 1'b0          ;
       endcase
    end

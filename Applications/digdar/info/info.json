@@ -1,6 +1,6 @@
 {
     "name": "digdar Marine Radar Scope",
-    "version": "0.1",
-    "revision": "0.1",
+    "version": "0.1-BUILD_NUMBER",
+    "revision": "REVISION",
     "description": "A scope for monitoring 4 signals from marine radar; two on fast ADCs and two on slow ADCs.  Brought to you by the makers of <a href=\"https://radr-project.org\">radr-project.org</a>"
 }
