@@ -29,6 +29,9 @@
 /* @brief Pointer to FPGA control registers. */
 static osc_fpga_reg_mem_t *g_osc_fpga_reg_mem = NULL;
 
+/* @brief Pointer to FPGA digdar control registers. */
+static digdar_fpga_reg_mem_t *g_digdar_fpga_reg_mem = NULL;
+
 /* @brief Pointer to data buffer where signal on channel A is captured.  */
 static uint32_t           *g_osc_fpga_cha_mem = NULL;
 
@@ -40,6 +43,9 @@ static uint32_t           *g_osc_fpga_xcha_mem = NULL;
 
 /* @brief Pointer to data buffer where signal on slow channel B is captured.  */
 static uint32_t           *g_osc_fpga_xchb_mem = NULL;
+
+/* @brief Number of azimuth pulses per rotation */
+static uint32_t            g_digdar_acp_per_arp = 0;
 
 /* @brief The memory file descriptor used to mmap() the FPGA space. */
 static int                 g_osc_fpga_mem_fd = -1;
@@ -82,6 +88,12 @@ static int __osc_fpga_cleanup_mem(void)
         g_osc_fpga_chb_mem = NULL;
         g_osc_fpga_xcha_mem = NULL;
         g_osc_fpga_xchb_mem = NULL;
+
+        if (munmap(g_digdar_fpga_reg_mem, DIGDAR_FPGA_BASE_SIZE) < 0) {
+            fprintf(stderr, "munmap() failed: %s\n", strerror(errno));
+            return -1;
+        }
+        g_digdar_fpga_reg_mem = NULL;
     }
 
     /* optionally close file descriptor */
@@ -96,7 +108,7 @@ static int __osc_fpga_cleanup_mem(void)
 
 /*----------------------------------------------------------------------------*/
 /**
- * @brief Initialize interface to Oscilloscope FPGA module
+ * @brief Initialize interface to Oscilloscope and Digdar FPGA modules
  *
  * Function first optionally cleanups previously established access to Oscilloscope
  * FPGA module. Afterwards a new connection to the Memory handler is instantiated
@@ -142,6 +154,19 @@ int osc_fpga_init(void)
     g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
         (OSC_FPGA_XCHB_OFFSET / sizeof(uint32_t));
 
+    page_addr = DIGDAR_FPGA_BASE_ADDR & (~(page_size-1));
+    page_off  = DIGDAR_FPGA_BASE_ADDR - page_addr;
+
+    page_ptr = mmap(NULL, DIGDAR_FPGA_BASE_SIZE, PROT_READ | PROT_WRITE,
+                          MAP_SHARED, g_osc_fpga_mem_fd, page_addr);
+
+    if((void *)page_ptr == MAP_FAILED) {
+        fprintf(stderr, "mmap() failed: %s\n", strerror(errno));
+        __osc_fpga_cleanup_mem();
+        return -1;
+    }
+    g_digdar_fpga_reg_mem = page_ptr + page_off;
+
     return 0;
 }
 
@@ -183,6 +208,17 @@ int osc_fpga_exit(void)
  * @param[in] ch1_probe_att      Channel A Attenuation
  * @param[in] ch2_probe_att      Channel B Attenuation
  * @param[in] enable_avg_at_dec  Apply average calculation during decimation
+ * @param[in] trig_excite        digdar trigger excitation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] trig_relax         digdar trigger relaxation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] digdar_trig_delay  digdar trigger delay (traditional meaning: how long after trigger does digitizing start)
+ * @param[in] trig_latency       digdar trigger latency: min delay between relaxation and excitation; unit: ADC clocks
+ * @param[in] acp_excite         digdar acp excitation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] acp_relax          digdar acp relaxation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] acp_latency        digdar acp latency: min delay between relaxation and excitation; unit: ADC clocks
+ * @param[in] arp_excite         digdar arp excitation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] arp_relax          digdar arp relaxation threshold; unit: relative to ADC full range; [-1 ... 1]
+ * @param[in] arp_latency        digdar arp latency: min delay between relaxation and excitation; unit: ADC clocks
+ * @param[in] acps_per_arp       digdar number of acps per arp 
  *
  * @retval  0 Success
  * @retval -1 Failure, error message is output on standard error device
@@ -195,7 +231,13 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
                            int ch2_calib_dc_off, float ch2_user_dc_off,
                            int ch1_probe_att, int ch2_probe_att,
                            int ch1_gain, int ch2_gain,
-                           int enable_avg_at_dec)
+                           int enable_avg_at_dec,
+                           float trig_excite, float trig_relax, float digdar_trig_delay, float trig_latency,
+                           float acp_excite, float acp_relax, float acp_latency,
+                           float arp_excite, float arp_relax, float arp_latency,
+                           float acps_per_arp
+                           )
+
 {
     /* TODO: Locking of memory map */
     int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source, 
@@ -302,8 +344,22 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
      g_osc_fpga_reg_mem->chb_filt_kk =gain_lo_chb_filt_kk;      
     }
     
-    
+       // Update digdar registers
+       
+       g_digdar_fpga_reg_mem->trig_thresh_excite = trig_excite * (1 << (c_osc_fpga_adc_bits - 1));
+       g_digdar_fpga_reg_mem->trig_thresh_relax  = trig_relax  * (1 << (c_osc_fpga_adc_bits - 1));
+       g_digdar_fpga_reg_mem->trig_delay   = digdar_trig_delay;
+       g_digdar_fpga_reg_mem->trig_latency = trig_latency;
 
+       g_digdar_fpga_reg_mem->acp_thresh_excite = acp_excite * (1 << (c_osc_fpga_xadc_bits - 1));
+       g_digdar_fpga_reg_mem->acp_thresh_relax  = acp_relax  * (1 << (c_osc_fpga_xadc_bits - 1));
+       g_digdar_fpga_reg_mem->acp_latency       = acp_latency;
+       
+       g_digdar_fpga_reg_mem->arp_thresh_excite = arp_excite * (1 << (c_osc_fpga_xadc_bits - 1));
+       g_digdar_fpga_reg_mem->arp_thresh_relax  = arp_relax  * (1 << (c_osc_fpga_xadc_bits - 1));
+       g_digdar_fpga_reg_mem->arp_latency       = arp_latency;
+
+       g_digdar_acp_per_arp = acps_per_arp;
     return 0;
 }
 
@@ -395,6 +451,20 @@ int osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal, 
     *xcha_signal = (int *)g_osc_fpga_xcha_mem;
     *xchb_signal = (int *)g_osc_fpga_xchb_mem;
     return 0;
+}
+
+/*----------------------------------------------------------------------------*/
+/**
+ * @brief Retrieve the base address of digdar registers
+ *
+ * @param[out] digdar_ptr Pointer to pointer to first digdar item
+ * @retval 0 Success, never fails
+ */
+int osc_fpga_get_digdar_ptr(uint32_t **digdar_ptr)
+{
+  if (digdar_ptr)
+    *digdar_ptr = (uint32_t *) g_digdar_fpga_reg_mem;
+  return 0;
 }
 
 
@@ -694,3 +764,4 @@ float osc_fpga_calc_adc_max_v(uint32_t fe_gain_fs, int probe_att)
 
     return max_adc_v;
 }
+

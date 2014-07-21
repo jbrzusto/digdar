@@ -52,9 +52,37 @@
 /** Offset to the memory buffer where signal on slow channel B is captured. */
 #define OSC_FPGA_XCHB_OFFSET   0x40000
 
+
+/** Starting address of FPGA registers handling the Digdar module. */
+#define DIGDAR_FPGA_BASE_ADDR 	0x40600000
+/** The size of FPGA register block handling the Digdar module. */
+#define DIGDAR_FPGA_BASE_SIZE 0x0000B8
+
+/** The offsets to the metadata (read-only-by client) in the FPGA register block
+    Must match values in red_pitaya_digdar.v from FPGA project
+ */
+
+#define OFFSET_SAVED_TRIG_COUNT           0x00068 // (saved) TRIG count since reset (32 bits; wraps)
+#define OFFSET_SAVED_TRIG_CLOCK_LOW       0x0006C // (saved) clock at most recent TRIG (low 32 bits)
+#define OFFSET_SAVED_TRIG_CLOCK_HIGH      0x00070 // (saved) clock at most recent TRIG (high 32 bits)
+#define OFFSET_SAVED_TRIG_PREV_CLOCK_LOW  0x00074 // (saved) clock at previous TRIG (low 32 bits)
+#define OFFSET_SAVED_TRIG_PREV_CLOCK_HIGH 0x00078 // (saved) clock at previous TRIG (high 32 bits)
+#define OFFSET_SAVED_ACP_COUNT            0x0007C // (saved) ACP count since reset (32 bits; wraps)
+#define OFFSET_SAVED_ACP_CLOCK_LOW        0x00080 // (saved) clock at most recent ACP (low 32 bits)
+#define OFFSET_SAVED_ACP_CLOCK_HIGH       0x00084 // (saved) clock at most recent ACP (high 32 bits)
+#define OFFSET_SAVED_ACP_PREV_CLOCK_LOW   0x00088 // (saved) clock at previous ACP (low 32 bits)
+#define OFFSET_SAVED_ACP_PREV_CLOCK_HIGH  0x0008C // (saved) clock at previous ACP (high 32 bits)
+#define OFFSET_SAVED_ARP_COUNT            0x00090 // (saved) ARP count since reset (32 bits; wraps)
+#define OFFSET_SAVED_ARP_CLOCK_LOW        0x00094 // (saved) clock at most recent ARP (low 32 bits)
+#define OFFSET_SAVED_ARP_CLOCK_HIGH       0x00098 // (saved) clock at most recent ARP (high 32 bits)
+#define OFFSET_SAVED_ARP_PREV_CLOCK_LOW   0x0009C // (saved) clock at previous ARP (low 32 bits)
+#define OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  0x000A0 // (saved) clock at previous ARP (high 32 bits)
+#define OFFSET_SAVED_ACP_PER_ARP          0x000A4 // (saved) count of ACP pulses between two most recent ARP pulses                                  
+
 /** Hysteresis register default setting */
 
 #define OSC_HYSTERESIS 0x3F
+
 
 /** @brief FPGA registry structure for Oscilloscope core module.
  *
@@ -193,6 +221,267 @@ typedef struct osc_fpga_reg_mem_s {
      * 0x20000 and are each 16k samples long */
 } osc_fpga_reg_mem_t;
 
+typedef struct digdar_fpga_reg_mem_s {
+
+  // --------------- TRIG -----------------
+
+    /** @brief  trig_thresh_excite: trigger excitation threshold
+     *          Trigger is raised for one FPGA clock after trigger channel
+     *          ADC value meets or exceeds this value (in direction away 
+     *          from trig_thresh_relax).
+     * bits [13: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+    uint32_t trig_thresh_excite;
+
+    /** @brief  trig_thresh_relax: trigger relaxation threshold
+     *          After a trigger has been raised, the trigger channel ADC value
+     *          must meet or exceeds this value (in direction away 
+     *          from trig_thresh_excite) before a trigger will be raised again.
+     *          (Serves to debounce signal in schmitt-trigger style).
+     * bits [13: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+  uint32_t trig_thresh_relax;
+
+    /** @brief  trig_delay: (traditional) trigger delay.
+     *          How long to wait after trigger is raised
+     *          before starting to capture samples from Video channel.
+     *          Note: this usage of 'delay' is traditional for radar digitizing
+     *          but differs from the red pitaya scope usage, which means 
+     *          "number of decimated ADC samples to acquire after trigger is raised"
+     * bits [31: 0] - unsigned wait time, in ADC clocks.
+     */
+  uint32_t trig_delay;
+
+    /** @brief  trig_latency: how long to wait after trigger relaxation before
+     *          allowing next excitation.
+     *          To further debounce the trigger signal, we can specify a minimum
+     *          wait time between relaxation and excitation.
+     * bits [31: 0] - unsigned latency time, in ADC clocks.
+     */
+  uint32_t trig_latency;
+
+    /** @brief  trig_count: number of trigger pulses detected since last reset
+     * bits [31: 0] - unsigned count of trigger pulses detected
+     */
+  uint32_t trig_count;
+
+    /** @brief  trig_clock_low: ADC clock count at last trigger pulse
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t trig_clock_low;
+
+    /** @brief  trig_clock_high: ADC clock count at last trigger pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t trig_clock_high;
+
+    /** @brief  trig_prev_clock_low: ADC clock count at previous trigger pulse,
+     *          so we can calculate trigger rate, regardless of capture rate
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t trig_prev_clock_low;
+
+    /** @brief  trig_prev_clock_high: ADC clock count at previous trigger pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t trig_prev_clock_high;
+
+  // --------------- ACP -----------------
+
+    /** @brief  acp_thresh_excite: acp excitation threshold
+     *          the acp pulse is detected and counted when the ACP slow ADC
+     *          channel meets or exceeds this value in the direction away
+     *          from acp_thresh_relax
+     * bits [11: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+
+    uint32_t acp_thresh_excite;
+
+    /** @brief  acp_thresh_relax: acp relaxation threshold
+     *          After an acp has been detected, the acp channel ADC value
+     *          must meet or exceeds this value (in direction away 
+     *          from acp_thresh_excite) before a acp will be detected again.
+     *          (Serves to debounce signal in schmitt-acp style).
+     * bits [11: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+  uint32_t acp_thresh_relax;
+
+    /** @brief  acp_latency: how long to wait after acp relaxation before
+     *          allowing next excitation.
+     *          To further debounce the acp signal, we can specify a minimum
+     *          wait time between relaxation and excitation.
+     * bits [31: 0] - unsigned latency time, in ADC clocks.
+     */
+  uint32_t acp_latency;
+
+    /** @brief  acp_count: number of acp pulses detected since last reset
+     * bits [31: 0] - unsigned count of acp pulses detected
+     */
+  uint32_t acp_count;
+
+    /** @brief  acp_clock_low: ADC clock count at last acp pulse
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t acp_clock_low;
+
+    /** @brief  acp_clock_high: ADC clock count at last acp pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t acp_clock_high;
+
+    /** @brief  acp_prev_clock_low: ADC clock count at previous acp pulse,
+     *          so we can calculate acp rate, regardless of capture rate
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t acp_prev_clock_low;
+
+    /** @brief  acp_prev_clock_high: ADC clock count at previous acp pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t acp_prev_clock_high;
+
+  // --------------- ARP -----------------
+
+    /** @brief  arp_thresh_excite: arp excitation threshold
+     *          the arp pulse is detected and counted when the ARP slow ADC
+     *          channel meets or exceeds this value in the direction away
+     *          from arp_thresh_relax
+     * bits [11: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+
+    uint32_t arp_thresh_excite;
+
+    /** @brief  arp_thresh_relax: arp relaxation threshold
+     *          After an arp has been detected, the arp channel ADC value
+     *          must meet or exceeds this value (in direction away 
+     *          from arp_thresh_excite) before a arp will be detected again.
+     *          (Serves to debounce signal in schmitt-arp style).
+     * bits [11: 0] - threshold, signed
+     * bit  [31:14] - reserved
+     */
+  uint32_t arp_thresh_relax;
+
+    /** @brief  arp_latency: how long to wait after arp relaxation before
+     *          allowing next excitation.
+     *          To further debounce the arp signal, we can specify a minimum
+     *          wait time between relaxation and excitation.
+     * bits [31: 0] - unsigned latency time, in ADC clocks.
+     */
+  uint32_t arp_latency;
+
+    /** @brief  arp_count: number of arp pulses detected since last reset
+     * bits [31: 0] - unsigned count of arp pulses detected
+     */
+  uint32_t arp_count;
+
+    /** @brief  arp_clock_low: ADC clock count at last arp pulse
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t arp_clock_low;
+
+    /** @brief  arp_clock_high: ADC clock count at last arp pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t arp_clock_high;
+
+    /** @brief  arp_prev_clock_low: ADC clock count at previous arp pulse,
+     *          so we can calculate arp rate, regardless of capture rate
+     * bits [31: 0] - unsigned (low 32 bits) of ADC clock count
+     */
+  uint32_t arp_prev_clock_low;
+
+    /** @brief  arp_prev_clock_high: ADC clock count at previous arp pulse
+     * bits [31: 0] - unsigned (high 32 bits) of ADC clock count
+     */
+  uint32_t arp_prev_clock_high;
+
+    /** @brief  acp_per_arp: count of ACP pulses between two most recent ARP pulses
+     * bits [31: 0] - unsigned count of ACP pulses
+     */
+  uint32_t acp_per_arp;
+
+  // --------------------- SAVED COPIES ----------------------------------------
+  // For these metadata, we want to record the values at the time of the
+  // most recently *captured* pulse.  So if the capture thread is not keeping up
+  // with the radar, we still have correct values of these metadata for each
+  // captured pulse (e.g. the value of the ACP count at each captured radar pulse).
+  // The FPGA knows at trigger detection time whether or not
+  // the pulse will be captured, and if so, copies the live metadata values to
+  // these saved locations.
+
+    /** @brief  saved_trig_count:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_count;
+
+    /** @brief  saved_trig_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_clock_low;
+
+    /** @brief  saved_trig_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_clock_high;
+
+    /** @brief  saved_trig_prev_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_prev_clock_low;
+
+    /** @brief  saved_trig_prev_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_prev_clock_high;
+
+    /** @brief  saved_acp_count:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_count;
+
+    /** @brief  saved_acp_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_clock_low;
+
+    /** @brief  saved_acp_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_clock_high;
+
+    /** @brief  saved_acp_prev_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_prev_clock_low;
+
+    /** @brief  saved_acp_prev_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_prev_clock_high;
+
+    /** @brief  saved_arp_count:  value at start of most recently captured pulse
+     */
+  uint32_t saved_arp_count;
+
+    /** @brief  saved_arp_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_arp_clock_low;
+
+    /** @brief  saved_arp_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_arp_clock_high;
+
+    /** @brief  saved_arp_prev_clock_low:  value at start of most recently captured pulse
+     */
+  uint32_t saved_arp_prev_clock_low;
+
+    /** @brief  saved_arp_prev_clock_high:  value at start of most recently captured pulse
+     */
+  uint32_t saved_arp_prev_clock_high;
+
+    /** @brief  saved_acp_per_arp:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_per_arp;
+
+  // other scratch / debugging registers which we don't bother mapping for now
+
+} digdar_fpga_reg_mem_t;
+
 /** @} */
 
 
@@ -213,7 +502,12 @@ int   osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
                              int ch2_calib_dc_off, float ch2_user_dc_off,
                              int ch1_probe_att, int ch2_probe_att,
 			      int ch1_gain, int ch2_gain,
-                             int enable_avg_at_dec);
+                             int enable_avg_at_dec,
+                             float trig_excite, float trig_relax, float digdar_trig_delay, float trig_latency,
+                             float acp_excite, float acp_relax, float acp_latency,
+                             float arp_excite, float arp_relax, float arp_latency,
+                             float acps_per_arp
+);
 int   osc_fpga_reset(void);
 int   osc_fpga_arm_trigger(void);
 int   osc_fpga_set_trigger(uint32_t trig_source);
@@ -233,5 +527,7 @@ float osc_fpga_cnv_xcnt_to_v(int cnts);
 float osc_fpga_cnv_cnt_to_rel(int cnts, int bits);
 
 float osc_fpga_calc_adc_max_v(uint32_t fe_gain_fs, int probe_att);
+
+int osc_fpga_get_digdar_ptr(uint32_t **digdar_memory);
 
 #endif /* __FPGA_H */

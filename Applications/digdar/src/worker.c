@@ -223,8 +223,10 @@ int rp_osc_set_signals(float **source, int index)
 /*----------------------------------------------------------------------------------*/
 int rp_osc_set_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas)
 {
-    rp_update_meas_data(ch1_meas, ch2_meas);
-    return 0;
+  uint32_t *digdar_ptr;
+  osc_fpga_get_digdar_ptr(& digdar_ptr);
+  rp_update_meas_data(ch1_meas, ch2_meas, digdar_ptr);
+  return 0;
 }
 
 
@@ -331,7 +333,22 @@ void *rp_osc_worker_thread(void *args)
                                       curr_params[PRB_ATT_CH2].value,
                                       curr_params[GAIN_CH1].value,
                                       curr_params[GAIN_CH2].value,				      
-                                      curr_params[EN_AVG_AT_DEC].value) < 0) {
+                                      curr_params[EN_AVG_AT_DEC].value,
+
+                                      curr_params[DIGDAR_TRIG_EXCITE_PARAM].value, 
+                                      curr_params[DIGDAR_TRIG_RELAX_PARAM].value, 
+                                      curr_params[DIGDAR_TRIG_DELAY_PARAM].value, 
+                                      curr_params[DIGDAR_TRIG_LATENCY_PARAM].value,
+                                      curr_params[DIGDAR_ACP_EXCITE_PARAM].value, 
+                                      curr_params[DIGDAR_ACP_RELAX_PARAM].value, 
+                                      curr_params[DIGDAR_ACP_LATENCY_PARAM].value,
+                                      curr_params[DIGDAR_ARP_EXCITE_PARAM].value, 
+                                      curr_params[DIGDAR_ARP_RELAX_PARAM].value, 
+                                      curr_params[DIGDAR_ARP_LATENCY_PARAM].value,
+                                      curr_params[DIGDAR_ACPS_PER_ARP_PARAM].value
+
+
+) < 0) {
                 fprintf(stderr, "Setting of FPGA registers failed\n");
                 rp_osc_worker_change_state(rp_osc_idle_state);
             }
@@ -857,7 +874,20 @@ int rp_osc_auto_set(rp_app_params_t *orig_params,
                    0,
                    rp_calib_params->fe_ch2_dc_offs,
                    0,
-                   ch1_probe_att, ch2_probe_att, ch1_gain, ch2_gain, 0);
+                               ch1_probe_att, ch2_probe_att, ch1_gain, ch2_gain, 0,
+                                      orig_params[DIGDAR_TRIG_EXCITE_PARAM].value, 
+                                      orig_params[DIGDAR_TRIG_RELAX_PARAM].value, 
+                                      orig_params[DIGDAR_TRIG_DELAY_PARAM].value, 
+                                      orig_params[DIGDAR_TRIG_LATENCY_PARAM].value,
+                                      orig_params[DIGDAR_ACP_EXCITE_PARAM].value, 
+                                      orig_params[DIGDAR_ACP_RELAX_PARAM].value, 
+                                      orig_params[DIGDAR_ACP_LATENCY_PARAM].value,
+                                      orig_params[DIGDAR_ARP_EXCITE_PARAM].value, 
+                                      orig_params[DIGDAR_ARP_RELAX_PARAM].value, 
+                                      orig_params[DIGDAR_ARP_LATENCY_PARAM].value,
+                                      orig_params[DIGDAR_ACPS_PER_ARP_PARAM].value
+
+);
 
         /* ARM & Trigger */
         osc_fpga_arm_trigger();
@@ -1024,7 +1054,19 @@ int rp_osc_auto_set(rp_app_params_t *orig_params,
                                    0,
                                    rp_calib_params->fe_ch2_dc_offs,
                                    0, 
-                                   ch1_probe_att, ch2_probe_att, ch1_gain, ch2_gain, en_avg_at_dec);
+                                   ch1_probe_att, ch2_probe_att, ch1_gain, ch2_gain, en_avg_at_dec,
+                                   orig_params[DIGDAR_TRIG_EXCITE_PARAM].value, 
+                                   orig_params[DIGDAR_TRIG_RELAX_PARAM].value, 
+                                   orig_params[DIGDAR_TRIG_DELAY_PARAM].value, 
+                                   orig_params[DIGDAR_TRIG_LATENCY_PARAM].value,
+                                   orig_params[DIGDAR_ACP_EXCITE_PARAM].value, 
+                                   orig_params[DIGDAR_ACP_RELAX_PARAM].value, 
+                                   orig_params[DIGDAR_ACP_LATENCY_PARAM].value,
+                                   orig_params[DIGDAR_ARP_EXCITE_PARAM].value, 
+                                   orig_params[DIGDAR_ARP_RELAX_PARAM].value, 
+                                   orig_params[DIGDAR_ARP_LATENCY_PARAM].value,
+                                   orig_params[DIGDAR_ACPS_PER_ARP_PARAM].value
+                                   );
 
             /* ARM & Trigger */
             osc_fpga_arm_trigger();

@@ -26,6 +26,8 @@
 #  define TRACE(args...) {}
 #endif
 
+#include <stdint.h>
+
 /* Parameters description structure - must be the same for all RP controllers */
 typedef struct rp_app_params_s {
     char  *name;
@@ -50,7 +52,7 @@ typedef struct rp_osc_meas_res_s {
 
 /* Parameters indexes - these defines should be in the same order as 
  * rp_app_params_t structure defined in main.c */
-#define PARAMS_NUM        81
+#define PARAMS_NUM        62
 #define MIN_GUI_PARAM     0
 #define MAX_GUI_PARAM     1
 #define TRIG_MODE_PARAM   2
@@ -93,56 +95,29 @@ typedef struct rp_osc_meas_res_s {
 #define GEN_DC_NORM_2     39
 #define SCALE_CH1         40
 #define SCALE_CH2         41
-/* AWG parameters */
-#define GEN_TRIG_MODE_CH1 42
-#define GEN_SIG_TYPE_CH1  43
-#define GEN_ENABLE_CH1    44
-#define GEN_SINGLE_CH1    45
-#define GEN_SIG_AMP_CH1   46
-#define GEN_SIG_FREQ_CH1  47
-#define GEN_SIG_DCOFF_CH1 48
-#define GEN_TRIG_MODE_CH2 49
-#define GEN_SIG_TYPE_CH2  50
-#define GEN_ENABLE_CH2    51
-#define GEN_SINGLE_CH2    52
-#define GEN_SIG_AMP_CH2   53
-#define GEN_SIG_FREQ_CH2  54
-#define GEN_SIG_DCOFF_CH2 55
-#define GEN_AWG_REFRESH   56
-/* PID parameters */
-#define PID_11_ENABLE     57
-#define PID_11_RESET      58
-#define PID_11_SP         59
-#define PID_11_KP         60
-#define PID_11_KI         61
-#define PID_11_KD         62
-#define PID_12_ENABLE     63
-#define PID_12_RESET      64
-#define PID_12_SP         65
-#define PID_12_KP         66
-#define PID_12_KI         67
-#define PID_12_KD         68
-#define PID_21_ENABLE     69
-#define PID_21_RESET      70
-#define PID_21_SP         71
-#define PID_21_KP         72
-#define PID_21_KI         73
-#define PID_21_KD         74
-#define PID_22_ENABLE     75
-#define PID_22_RESET      76
-#define PID_22_SP         77
-#define PID_22_KP         78
-#define PID_22_KI         79
-#define PID_22_KD         80
 
-/* Defines from which parameters on are AWG parameters (used in set_param() to
- * trigger update only on needed part - either Oscilloscope, AWG or PID */
-#define PARAMS_AWG_PARAMS 42
+// digdar specific 
 
-/* Defines from which parameters on are PID parameters (used in set_param() to
- * trigger update only on needed part - either Oscilloscope, AWG or PID */
-#define PARAMS_PID_PARAMS 57
-#define PARAMS_PER_PID     6
+#define DIGDAR_TRIG_EXCITE_PARAM   42 
+#define DIGDAR_TRIG_RELAX_PARAM    43 
+#define DIGDAR_TRIG_DELAY_PARAM    44 
+#define DIGDAR_TRIG_LATENCY_PARAM  45 
+#define DIGDAR_ACP_EXCITE_PARAM    46 
+#define DIGDAR_ACP_RELAX_PARAM     47 
+#define DIGDAR_ACP_LATENCY_PARAM   48 
+#define DIGDAR_ARP_EXCITE_PARAM    49 
+#define DIGDAR_ARP_RELAX_PARAM     50 
+#define DIGDAR_ARP_LATENCY_PARAM   51 
+#define DIGDAR_ACPS_PER_ARP_PARAM  52 
+#define DIGDAR_TRIGS_SEEN          53 
+#define DIGDAR_TRIGS_CAPTURED      54 
+#define DIGDAR_TRIG_RATE           55 
+#define DIGDAR_CAPTURE_RATE        56
+#define DIGDAR_ACPS_SEEN           57 
+#define DIGDAR_ACP_RATE            58 
+#define DIGDAR_ARPS_SEEN           59 
+#define DIGDAR_ARP_RATE            60  
+#define DIGDAR_ACPS_PER_ARP        61  
 
 /* Output signals */
 #define SIGNAL_LENGTH (1024) /* Must be 2^n! */
@@ -179,7 +154,7 @@ void transform_from_iface_units(rp_app_params_t *p);
  * are read-only for the client and there is no need to update them internally
  * in the application 
  */
-int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas);
+int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas, uint32_t *digdar_regs);
 
 /* Waveform generator frequency limiter. */
 float rp_gen_limit_freq(float freq, float gen_type);

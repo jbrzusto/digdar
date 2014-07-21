@@ -30,6 +30,7 @@
   <script src="../assets/flot/jquery.flot.navigate.js"></script>
   <script src="../assets/flot/jquery.flot.resize.min.js"></script>
   <script src="../assets/flot/jquery.flot.touch.js?2"></script>
+  <script src="../assets/jcanvas.min.js"></script>
   <script type="text/javascript">
   
   // Settings which can be modified
@@ -524,6 +525,23 @@
           plot.setData(filterData(datasets, plot.width()));
           plot.setupGrid();
           plot.draw();
+        var canv = $(".flot-base");
+        canv.drawText({
+  fillStyle: '#808080',
+  strokeStyle: '#000',
+  strokeWidth: 1,
+  x: 100, y: 100,
+  fontSize: 14,
+  text: "Trigs seen: " + params.original.digdar_trigs_seen + "; captured: " + params.original.digdar_trigs_captured + "\n" + "Capture rate: " + params.original.digdar_capture_rate
+});  
+      canv.drawArc({
+  strokeStyle: '#000',
+  strokeWidth: 5,
+  x: 100, y: 100,
+  radius: 50,
+  // start and end angles in degrees
+  start: 0, end: params.original.digdar_acps_seen / 450 * 360
+});                                               
         }
         
         if(! trig_dragging) {

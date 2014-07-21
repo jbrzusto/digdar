@@ -30,8 +30,6 @@
 #include "worker.h"
 #include "fpga.h"
 #include "calib.h"
-#include "generate.h"
-#include "pid.h"
 
 /* Describe app. parameters with some info/limitations */
 pthread_mutex_t rp_main_params_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -166,139 +164,51 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
     { /* scale_ch2 - Jumper & probe attenuation dependent Y scaling factor for Channel 2 */
         "scale_ch2", 0, 0, 1, -1000, 1000 },
 
-    /********************************************************/
-    /* Arbitrary Waveform Generator parameters from here on */
-    /********************************************************/
+    { /* digdar_trig_excite_param - trigger excitation level in range -1..1 (units are relative to full ADC range)  */
+      "digdar_trig_excite_param", 0.1, 1, 0, -1, 1 },
+    { /* digdar_trig_relax_param - trigger relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_trig_relax_param", 0.01, 1, 0, -1, 1 },
+    { /* digdar_trig_delay_param - number of undecimated ADC clocks to wait after trigger before capturing samples*/
+      "digdar_trig_delay_param", 0, 1, 0, 0, 1e8 },
+    { /* digdar_trig_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_trig_latency_param", 125e2, 1, 0, 0, 1e8 },
+    { /* digdar_acp_excite_param -  ACP excitation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_acp_excite_param", 0.8, 1, 0, -1, 1 },
+    { /* digdar_acp_relax_param -  ACP relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_acp_relax_param", 0.1, 1, 0, -1, 1 },
+    { /* digdar_acp_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_acp_latency_param", 125e3, 1, 0, 0, 1e8 },
+    { /* digdar_arp_excite_param - ARP excitation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_arp_excite_param", 0.8, 1, 0, -1, 1 },
+    { /* digdar_arp_relax_param -  ARP relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_arp_relax_param", 0.1, 1, 0, -1, 1 },
+    { /* digdar_arp_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_arp_latency_param", 125e6, 1, 0, 0, 1e8 },
+    { /* digdar_acps_per_arp_param - number of ACPs per ARP for this radar (should be constant) */
+      "digdar_acps_per_arp_param", 450, 0, 0, 0, 16384 },
 
-    { /* gen_trig_mod_ch1 - Selects the trigger mode for channel 1:
-       *    0 - continuous
-       *    1 - single 
-       *    2 - external */
-        "gen_trig_mod_ch1", 0, 1, 0, 0, 2 },
-    { /* gen_sig_type_ch1 - Selects the type of signal for channel 1:
-       *    0 - sine
-       *    1 - square
-       *    2 - triangle
-       *    3 - from file */
-        "gen_sig_type_ch1", 0, 1, 0, 0, 3 },
-    { /* gen_enable_ch1 - Enables/disable signal generation on channel 1:
-       *    0 - Channel 1 disabled
-       *    1 - Channel 1 enabled */
-        "gen_enable_ch1", 0, 1, 0, 0, 1 },
-    { /* gen_single_ch1 - Fire single trigger on generator channel 1:
-       *    0 - Do not fire single trigger
-       *    1 - Fire single trigger */
-        "gen_single_ch1", 0, 1, 0, 0, 1 },
-    { /* gen_sig_amp_ch1 - Amplitude for Channel 1 in [Vpp] */
-        "gen_sig_amp_ch1", 0, 1, 0, 0, 2.0 },
-    { /* gen_sig_freq_ch1 - Frequency for Channel 1 in [Hz] */
-        "gen_sig_freq_ch1", 1000, 1, 0, 0, 50e6 },
-    { /* gen_sig_dcoff_ch1 - DC offset applied to the signal in [V] */
-        "gen_sig_dcoff_ch1", 0, 1, 0, -1, 1 },
-    { /* gen_trig_mod_ch2 - Selects the trigger mode for channel 2:
-       *    0 - continuous
-       *    1 - single 
-       *    2 - external */
-        "gen_trig_mod_ch2", 0, 1, 0, 0, 2 },
-    { /* gen_sig_type_ch2 - Selects the type of signal for channel 2:
-       *    0 - sine
-       *    1 - square
-       *    2 - triangle
-       *    3 - from file */
-        "gen_sig_type_ch2", 0, 1, 0, 0, 3 },
-    { /* gen_enable_ch2 - Enables/disable signal generation on channel 2:
-       *    0 - channel 2 disabled
-       *    1 - channel 2 enabled */
-        "gen_enable_ch2", 0, 1, 0, 0, 1 },
-    { /* gen_single_ch2 - Fire single trigger on generator channel 2:
-       *    0 - Do not fire single trigger
-       *    1 - Fire single trigger */
-        "gen_single_ch2", 0, 1, 0, 0, 1 },
-    { /* gen_sig_amp_ch2 - Amplitude for channel 2 in [Vpp] */
-        "gen_sig_amp_ch2", 0, 1, 0, 0, 2.0 },
-    { /* gen_sig_freq_ch2 - Frequency for channel 2 in [Hz] */
-        "gen_sig_freq_ch2", 1000, 1, 0, 0.2, 50e6 },
-    { /* gen_sig_dcoff_ch2 - DC offset applied to the signal in [V] */
-        "gen_sig_dcoff_ch2", 0, 1, 0, -1, 1 },
-    { /* gen_awg_refresh - Refresh AWG data from (uploaded) file.
-       *     0 - Do not refresh
-       *     1 - Refresh Channel 1
-       *     2 - Refresh Channel 2
-       */
-        "gen_awg_refresh",   0, 0, 0, 0, 2 },
+    // metadata - read only
 
-    /******************************************/
-    /* PID Controller parameters from here on */
-    /******************************************/
-
-    { /* pid_NN_enable - Enables/closes or disables/open PID NN loop:
-       *    0 - PID disabled (open loop)
-       *    1 - PID enabled (closed loop)    */
-        "pid_11_enable", 0, 1, 0, 0, 1 },
-    { /* pid_NN_rst - Reset PID NN integrator:
-        *    0 - Do not reset integrator
-        *    1 - Reset integrator            */
-        "pid_11_rst", 0, 1, 0, 0, 1 },
-    { /* pid_NN_sp - PID NN set-point in [ADC] counts. */
-        "pid_11_sp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kp - PID NN proportional gain Kp in [ADC] counts. */
-        "pid_11_kp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_ki - PID NN integral gain     Ki in [ADC] counts. */
-        "pid_11_ki",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kd - PID NN derivative gain   Kd in [ADC] counts. */
-        "pid_11_kd",  0, 1, 0, -8192, 8191 },
-
-    { /* pid_NN_enable - Enables/closes or disables/open PID NN loop:
-       *    0 - PID disabled (open loop)
-       *    1 - PID enabled (closed loop)    */
-        "pid_12_enable", 0, 1, 0, 0, 1 },
-    { /* pid_NN_rst - Reset PID NN integrator:
-        *    0 - Do not reset integrator
-        *    1 - Reset integrator            */
-        "pid_12_rst", 0, 1, 0, 0, 1 },
-    { /* pid_NN_sp - PID NN set-point in [ADC] counts. */
-        "pid_12_sp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kp - PID NN proportional gain Kp in [ADC] counts. */
-        "pid_12_kp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_ki - PID NN integral gain     Ki in [ADC] counts. */
-        "pid_12_ki",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kd - PID NN derivative gain   Kd in [ADC] counts. */
-        "pid_12_kd",  0, 1, 0, -8192, 8191 },
-
-    { /* pid_NN_enable - Enables/closes or disables/open PID NN loop:
-       *    0 - PID disabled (open loop)
-       *    1 - PID enabled (closed loop)    */
-        "pid_21_enable", 0, 1, 0, 0, 1 },
-    { /* pid_NN_rst - Reset PID NN integrator:
-        *    0 - Do not reset integrator
-        *    1 - Reset integrator            */
-        "pid_21_rst", 0, 1, 0, 0, 1 },
-    { /* pid_NN_sp - PID NN set-point in [ADC] counts. */
-        "pid_21_sp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kp - PID NN proportional gain Kp in [ADC] counts. */
-        "pid_21_kp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_ki - PID NN integral gain     Ki in [ADC] counts. */
-        "pid_21_ki",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kd - PID NN derivative gain   Kd in [ADC] counts. */
-        "pid_21_kd",  0, 1, 0, -8192, 8191 },
-
-    { /* pid_NN_enable - Enables/closes or disables/open PID NN loop:
-       *    0 - PID disabled (open loop)
-       *    1 - PID enabled (closed loop)    */
-        "pid_22_enable", 0, 1, 0, 0, 1 },
-    { /* pid_NN_rst - Reset PID NN integrator:
-        *    0 - Do not reset integrator
-        *    1 - Reset integrator            */
-        "pid_22_rst", 0, 1, 0, 0, 1 },
-    { /* pid_NN_sp - PID NN set-point in [ADC] counts. */
-        "pid_22_sp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kp - PID NN proportional gain Kp in [ADC] counts. */
-        "pid_22_kp",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_ki - PID NN integral gain     Ki in [ADC] counts. */
-        "pid_22_ki",  0, 1, 0, -8192, 8191 },
-    { /* pid_NN_kd - PID NN derivative gain   Kd in [ADC] counts. */
-        "pid_22_kd",  0, 1, 0, -8192, 8191 },
-
+    { /* digdar_trigs_seen - count of trigger pulses seen since reset */
+      "digdar_trigs_seen", 0, 0, 1, 0, 0 },
+    { /* digdar_trigs_captured - count of radar pulses for which data was captured since reset; difference between this and digdar_trigs_seen indicates 
+       data capture is not keeping up with radar; this might not matter, of course */
+      "digdar_trigs_captured", 0, 0, 1, 0, 0 },
+    { /* digdar_trig_rate - rate of trigger pulses, in Hz, based on latest inter-trigger interval */
+      "digdar_trig_rate", 0, 0, 1, 0, 0 },
+    { /* digdar_capture_rate - rate of data capture, in pulses per second, based on latest interval between captured pulses */
+      "digdar_capture_rate", 0, 0, 1, 0, 0 },
+    { /* digdar_acps_seen - count of ACP pulses seen since reset */
+      "digdar_acps_seen", 0, 0, 1, 0, 0 },
+    { /* digdar_acp_rate - rate of ACP pulses, in Hz, based on latest inter-ACP interval */
+      "digdar_acp_rate", 0, 0, 1, 0, 0 },
+    { /* digdar_arps_seen - count of ARP pulses seen since reset */
+      "digdar_arps_seen", 0, 0, 1, 0, 0 },
+    { /* digdar_arp_rate - rate of ARP pulses, in RPM, based on latest inter-ARP interval */
+      "digdar_arps_rate", 0, 0, 1, 0, 0 },
+    { /* digdar_acps_per_arp - number of ACP pulses seen between most recent two ARP pulses; should match digdar_acps_per_arp_param */
+      "digdar_acps_per_arp", 0, 0, 1, 0, 0 },
+ 
     { /* Must be last! */
         NULL, 0.0, -1, -1, 0.0, 0.0 }     
 };
@@ -324,7 +234,7 @@ const char *rp_app_desc(void)
 
 int rp_app_init(void)
 {
-    fprintf(stderr, "Loading scope (with gen+pid extensions) version %s-%s.\n", VERSION_STR, REVISION_STR);
+    fprintf(stderr, "Loading digdar radar scope version %s-%s.\n", VERSION_STR, REVISION_STR);
 
     rp_default_calib_params(&rp_main_calib_params);
     if(rp_read_calib_params(&rp_main_calib_params) < 0) {
@@ -333,12 +243,6 @@ int rp_app_init(void)
     }
     if(rp_osc_worker_init(&rp_main_params[0], PARAMS_NUM, 
                           &rp_main_calib_params) < 0) {
-        return -1;
-    }
-    if(generate_init(&rp_main_calib_params) < 0) {
-        return -1;
-    }
-    if(pid_init() < 0) {
         return -1;
     }
 
@@ -350,11 +254,9 @@ int rp_app_init(void)
 
 int rp_app_exit(void)
 {
-    fprintf(stderr, "Unloading scope (with gen+pid extensions) version %s-%s.\n", VERSION_STR, REVISION_STR);
+    fprintf(stderr, "Unloading digdar radar scope version %s-%s.\n", VERSION_STR, REVISION_STR);
 
     rp_osc_worker_exit();
-    generate_exit();
-    pid_exit();
 
     return 0;
 }
@@ -619,8 +521,6 @@ int rp_set_params(rp_app_params_t *p, int len)
     int i;
     int fpga_update = 1;
     int params_change = 0;
-    int awg_params_change = 0;
-    int pid_params_change = 0;
     
     TRACE("%s()\n", __FUNCTION__);
 
@@ -657,14 +557,9 @@ int rp_set_params(rp_app_params_t *p, int len)
             continue;
 
         if(rp_main_params[p_idx].value != p[i].value) {
-            if(p_idx < PARAMS_AWG_PARAMS) 
-                params_change = 1;
-            if ( (p_idx >= PARAMS_AWG_PARAMS) && (p_idx < PARAMS_PID_PARAMS) )
-                awg_params_change = 1;
-            if(p_idx >= PARAMS_PID_PARAMS)
-                pid_params_change = 1;
-            if(rp_main_params[p_idx].fpga_update)
-                fpga_update = 1;
+          params_change = 1;
+          if(rp_main_params[p_idx].fpga_update)
+            fpga_update = 1;
         }
         if(rp_main_params[p_idx].min_val > p[i].value) {
             fprintf(stderr, "Incorrect parameters value: %f (min:%f), "
@@ -863,25 +758,6 @@ int rp_set_params(rp_app_params_t *p, int len)
         }
     }
 
-    if(awg_params_change) {
-
-        /* Correct frequencies if needed */
-        rp_main_params[GEN_SIG_FREQ_CH1].value = 
-            rp_gen_limit_freq(rp_main_params[GEN_SIG_FREQ_CH1].value,
-                              rp_main_params[GEN_SIG_TYPE_CH1].value);
-        rp_main_params[GEN_SIG_FREQ_CH2].value = 
-            rp_gen_limit_freq(rp_main_params[GEN_SIG_FREQ_CH2].value,
-                              rp_main_params[GEN_SIG_TYPE_CH2].value);
-        if(generate_update(&rp_main_params[0]) < 0) {
-            return -1;
-        }
-    }
-
-    if (pid_params_change) {
-        if(pid_update(&rp_main_params[0]) < 0) {
-            return -1;
-        }
-    }
 
     return 0;
 }
@@ -1115,9 +991,13 @@ int rp_update_main_params(rp_app_params_t *params)
     return 0;
 }
 
-int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas)
+int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas, uint32_t *digdar_regs)
 {
+    static uint64_t trigs_captured = 0;
+    static uint64_t prev_capture_clocks;
+
     pthread_mutex_lock(&rp_main_params_mutex);
+
     rp_main_params[MEAS_MIN_CH1].value = ch1_meas.min;
     rp_main_params[MEAS_MAX_CH1].value = ch1_meas.max;
     rp_main_params[MEAS_AMP_CH1].value = ch1_meas.amp;
@@ -1131,6 +1011,32 @@ int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas)
     rp_main_params[MEAS_AVG_CH2].value = ch2_meas.avg;
     rp_main_params[MEAS_FREQ_CH2].value = ch2_meas.freq;
     rp_main_params[MEAS_PER_CH2].value = ch2_meas.period;
+
+    rp_main_params[DIGDAR_TRIGS_SEEN          ].value = digdar_regs[OFFSET_SAVED_TRIG_COUNT / sizeof(int)          ];
+    rp_main_params[DIGDAR_TRIGS_CAPTURED      ].value = ++trigs_captured;
+    int32_t trig_interval = digdar_regs[OFFSET_SAVED_TRIG_CLOCK_LOW / sizeof(int)] - digdar_regs[OFFSET_SAVED_TRIG_PREV_CLOCK_LOW / sizeof(int)];
+    if (trig_interval < 0) // FIXME: we're assuming TRIG_CLOCK_HIGHs differ by only 1 here
+      trig_interval = 0x100000000ULL + trig_interval;
+    rp_main_params[DIGDAR_TRIG_RATE           ].value =  trig_interval > 0 ? 125e5 / trig_interval : 0;
+
+    uint64_t capture_clocks = ((uint64_t) digdar_regs[OFFSET_SAVED_TRIG_CLOCK_HIGH / sizeof(int)] << 32) + digdar_regs[OFFSET_SAVED_TRIG_CLOCK_LOW / sizeof(int)];
+    uint64_t capture_interval = capture_clocks - prev_capture_clocks;
+    rp_main_params[DIGDAR_CAPTURE_RATE        ].value =  capture_interval > 0 ? 125e6 / capture_interval : 0;
+    prev_capture_clocks = capture_clocks;
+
+    rp_main_params[DIGDAR_ACPS_SEEN           ].value = digdar_regs[OFFSET_SAVED_ACP_COUNT           ];
+    int32_t acp_interval = digdar_regs[OFFSET_SAVED_ACP_CLOCK_LOW] - digdar_regs[OFFSET_SAVED_ACP_PREV_CLOCK_LOW];
+    if (acp_interval < 0) // FIXME: we're assuming ACP_CLOCK_HIGHs differ by only 1 here
+      acp_interval = 0x100000000ULL + acp_interval;
+    rp_main_params[DIGDAR_ACP_RATE           ].value =  acp_interval > 0 ? 125e5 / acp_interval : 0;
+
+    rp_main_params[DIGDAR_ARPS_SEEN           ].value = digdar_regs[OFFSET_SAVED_ARP_COUNT           ];
+    int32_t arp_interval = digdar_regs[OFFSET_SAVED_ARP_CLOCK_LOW] - digdar_regs[OFFSET_SAVED_ARP_PREV_CLOCK_LOW];
+    if (arp_interval < 0) // FIXME: we're assuming ARP_CLOCK_HIGHs differ by only 1 here
+      arp_interval = 0x100000000ULL + arp_interval;
+    rp_main_params[DIGDAR_ARP_RATE           ].value =  arp_interval > 0 ? 60.0 * (125e5 / arp_interval) : 0;
+
+    rp_main_params[DIGDAR_ACPS_PER_ARP        ].value = digdar_regs[OFFSET_SAVED_ACP_PER_ARP         ];
 
     pthread_mutex_unlock(&rp_main_params_mutex);
     return 0;
