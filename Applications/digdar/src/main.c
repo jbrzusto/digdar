@@ -164,28 +164,28 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
     { /* scale_ch2 - Jumper & probe attenuation dependent Y scaling factor for Channel 2 */
         "scale_ch2", 0, 0, 1, -1000, 1000 },
 
-    { /* digdar_trig_excite_param - trigger excitation level in range -1..1 (units are relative to full ADC range)  */
-      "digdar_trig_excite_param", 0.1, 1, 0, -1, 1 },
-    { /* digdar_trig_relax_param - trigger relaxation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_trig_relax_param", 0.01, 1, 0, -1, 1 },
-    { /* digdar_trig_delay_param - number of undecimated ADC clocks to wait after trigger before capturing samples*/
-      "digdar_trig_delay_param", 0, 1, 0, 0, 1e8 },
-    { /* digdar_trig_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
-      "digdar_trig_latency_param", 125e2, 1, 0, 0, 1e8 },
-    { /* digdar_acp_excite_param -  ACP excitation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_acp_excite_param", 0.8, 1, 0, -1, 1 },
-    { /* digdar_acp_relax_param -  ACP relaxation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_acp_relax_param", 0.1, 1, 0, -1, 1 },
-    { /* digdar_acp_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
-      "digdar_acp_latency_param", 125e3, 1, 0, 0, 1e8 },
-    { /* digdar_arp_excite_param - ARP excitation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_arp_excite_param", 0.8, 1, 0, -1, 1 },
-    { /* digdar_arp_relax_param -  ARP relaxation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_arp_relax_param", 0.1, 1, 0, -1, 1 },
-    { /* digdar_arp_latency_param - minimum time delay (ADC clocks) between relaxation and next excitation */
-      "digdar_arp_latency_param", 125e6, 1, 0, 0, 1e8 },
-    { /* digdar_acps_per_arp_param - number of ACPs per ARP for this radar (should be constant) */
-      "digdar_acps_per_arp_param", 450, 0, 0, 0, 16384 },
+    { /* digdar_trig_excite - trigger excitation level in range -1..1 (units are relative to full ADC range)  */
+      "digdar_trig_excite", 0.1, 1, 0, -1, 1 },
+    { /* digdar_trig_relax - trigger relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_trig_relax", 0.01, 1, 0, -1, 1 },
+    { /* digdar_trig_delay - number of undecimated ADC clocks to wait after trigger before capturing samples*/
+      "digdar_trig_delay", 0, 1, 0, 0, 1e8 },
+    { /* digdar_trig_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_trig_latency", 125e2, 1, 0, 0, 1e8 },
+    { /* digdar_acp_excite -  ACP excitation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_acp_excite", 0.8, 1, 0, -1, 1 },
+    { /* digdar_acp_relax -  ACP relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_acp_relax", 0.1, 1, 0, -1, 1 },
+    { /* digdar_acp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_acp_latency", 125e3, 1, 0, 0, 1e8 },
+    { /* digdar_arp_excite - ARP excitation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_arp_excite", 0.8, 1, 0, -1, 1 },
+    { /* digdar_arp_relax -  ARP relaxation level in range -1..1 (units are relative to full ADC range) */
+      "digdar_arp_relax", 0.1, 1, 0, -1, 1 },
+    { /* digdar_arp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
+      "digdar_arp_latency", 125e6, 1, 0, 0, 1e8 },
+    { /* digdar_acps_per_arp - number of ACPs per ARP for this radar (should be constant) */
+      "digdar_acps_per_arp", 450, 0, 0, 0, 16384 },
 
     // metadata - read only
 
@@ -624,8 +624,9 @@ int rp_set_params(rp_app_params_t *p, int len)
             
             /* Wait for auto-set algorithm to finish or timeout */
             int timeout = 10000000; // [us]
-            const int step = 50000; // [us]
-            rp_osc_worker_state_t state;
+            //            const int step = 50000; // [us]
+            const int step = 5000; // [us] 
+           rp_osc_worker_state_t state;
             while (timeout > 0) {
          
                 rp_osc_worker_get_state(&state);
@@ -994,7 +995,7 @@ int rp_update_main_params(rp_app_params_t *params)
 int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas, uint32_t *digdar_regs)
 {
     static uint64_t trigs_captured = 0;
-    static uint64_t prev_capture_clocks;
+    static uint64_t prev_capture_clocks = 0;
 
     pthread_mutex_lock(&rp_main_params_mutex);
 
@@ -1012,31 +1013,33 @@ int rp_update_meas_data(rp_osc_meas_res_t ch1_meas, rp_osc_meas_res_t ch2_meas, 
     rp_main_params[MEAS_FREQ_CH2].value = ch2_meas.freq;
     rp_main_params[MEAS_PER_CH2].value = ch2_meas.period;
 
-    rp_main_params[DIGDAR_TRIGS_SEEN          ].value = digdar_regs[OFFSET_SAVED_TRIG_COUNT / sizeof(int)          ];
+#define DIGDAR_REG(BYTE_OFFSET) (*(int32_t *) (((uint8_t *) digdar_regs) + BYTE_OFFSET))
+
+    rp_main_params[DIGDAR_TRIGS_SEEN          ].value = DIGDAR_REG(OFFSET_SAVED_TRIG_COUNT);
     rp_main_params[DIGDAR_TRIGS_CAPTURED      ].value = ++trigs_captured;
-    int32_t trig_interval = digdar_regs[OFFSET_SAVED_TRIG_CLOCK_LOW / sizeof(int)] - digdar_regs[OFFSET_SAVED_TRIG_PREV_CLOCK_LOW / sizeof(int)];
+    int64_t trig_interval = DIGDAR_REG(OFFSET_SAVED_TRIG_CLOCK_LOW) - DIGDAR_REG(OFFSET_SAVED_TRIG_PREV_CLOCK_LOW);
     if (trig_interval < 0) // FIXME: we're assuming TRIG_CLOCK_HIGHs differ by only 1 here
       trig_interval = 0x100000000ULL + trig_interval;
-    rp_main_params[DIGDAR_TRIG_RATE           ].value =  trig_interval > 0 ? 125e5 / trig_interval : 0;
+    rp_main_params[DIGDAR_TRIG_RATE           ].value =  trig_interval > 0 ? 125e6 / trig_interval : 0;
 
-    uint64_t capture_clocks = ((uint64_t) digdar_regs[OFFSET_SAVED_TRIG_CLOCK_HIGH / sizeof(int)] << 32) + digdar_regs[OFFSET_SAVED_TRIG_CLOCK_LOW / sizeof(int)];
+    uint64_t capture_clocks = ((uint64_t) DIGDAR_REG(OFFSET_SAVED_TRIG_CLOCK_HIGH) << 32) + DIGDAR_REG(OFFSET_SAVED_TRIG_CLOCK_LOW);
     uint64_t capture_interval = capture_clocks - prev_capture_clocks;
     rp_main_params[DIGDAR_CAPTURE_RATE        ].value =  capture_interval > 0 ? 125e6 / capture_interval : 0;
     prev_capture_clocks = capture_clocks;
 
-    rp_main_params[DIGDAR_ACPS_SEEN           ].value = digdar_regs[OFFSET_SAVED_ACP_COUNT           ];
-    int32_t acp_interval = digdar_regs[OFFSET_SAVED_ACP_CLOCK_LOW] - digdar_regs[OFFSET_SAVED_ACP_PREV_CLOCK_LOW];
+    rp_main_params[DIGDAR_ACPS_SEEN           ].value = DIGDAR_REG(OFFSET_SAVED_ACP_COUNT);
+    int64_t acp_interval = DIGDAR_REG(OFFSET_SAVED_ACP_CLOCK_LOW) - DIGDAR_REG(OFFSET_SAVED_ACP_PREV_CLOCK_LOW);
     if (acp_interval < 0) // FIXME: we're assuming ACP_CLOCK_HIGHs differ by only 1 here
       acp_interval = 0x100000000ULL + acp_interval;
-    rp_main_params[DIGDAR_ACP_RATE           ].value =  acp_interval > 0 ? 125e5 / acp_interval : 0;
+    rp_main_params[DIGDAR_ACP_RATE           ].value =  acp_interval > 0 ? 125e6 / acp_interval : 0;
 
-    rp_main_params[DIGDAR_ARPS_SEEN           ].value = digdar_regs[OFFSET_SAVED_ARP_COUNT           ];
-    int32_t arp_interval = digdar_regs[OFFSET_SAVED_ARP_CLOCK_LOW] - digdar_regs[OFFSET_SAVED_ARP_PREV_CLOCK_LOW];
+    rp_main_params[DIGDAR_ARPS_SEEN           ].value = DIGDAR_REG(OFFSET_SAVED_ARP_COUNT);
+    int64_t arp_interval = DIGDAR_REG(OFFSET_SAVED_ARP_CLOCK_LOW) - DIGDAR_REG(OFFSET_SAVED_ARP_PREV_CLOCK_LOW);
     if (arp_interval < 0) // FIXME: we're assuming ARP_CLOCK_HIGHs differ by only 1 here
       arp_interval = 0x100000000ULL + arp_interval;
-    rp_main_params[DIGDAR_ARP_RATE           ].value =  arp_interval > 0 ? 60.0 * (125e5 / arp_interval) : 0;
+    rp_main_params[DIGDAR_ARP_RATE           ].value =  arp_interval > 0 ? 60.0 * (125e6 / arp_interval) : 0;
 
-    rp_main_params[DIGDAR_ACPS_PER_ARP        ].value = digdar_regs[OFFSET_SAVED_ACP_PER_ARP         ];
+    rp_main_params[DIGDAR_ACPS_PER_ARP        ].value = DIGDAR_REG(OFFSET_SAVED_ACP_PER_ARP);
 
     pthread_mutex_unlock(&rp_main_params_mutex);
     return 0;

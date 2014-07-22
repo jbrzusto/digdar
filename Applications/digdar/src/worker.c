@@ -361,7 +361,8 @@ void *rp_osc_worker_thread(void *args)
         }
 
         if(state == rp_osc_idle_state) {
-            usleep(10000);
+          //            usleep(10000);
+            usleep(500);
             continue;
         }
 
@@ -410,10 +411,12 @@ void *rp_osc_worker_thread(void *args)
                 /* time delay is always in seconds - convert to [us] and
                 * sleep 
                 */
-                usleep(round(-1 * time_delay * 1e6));
+              //                usleep(round(-1 * time_delay * 1e6));
+                usleep(round(-1 * time_delay * 2e4));
             } else {
                 if(curr_params[TIME_RANGE_PARAM].value > 4)
-                    usleep(5000);
+                  //                    usleep(5000);
+                    usleep(250);
                 else
                     usleep(1);
             }
@@ -457,7 +460,8 @@ void *rp_osc_worker_thread(void *args)
                         break;
                     }
                 }
-                usleep(1000);
+                //                usleep(1000);
+                usleep(50);
             }
         }
 
@@ -508,7 +512,8 @@ void *rp_osc_worker_thread(void *args)
              
             /* we are after trigger - so let's wait a while to collect some 
             * samples */
-            usleep(long_acq_part_delay); /* Sleep for 200 [ms] */
+            //            usleep(long_acq_part_delay); /* Sleep for 200 [ms] */
+            usleep(long_acq_part_delay/20); /* Sleep for 200 [ms] */
         }
 
         pthread_mutex_lock(&rp_osc_ctrl_mutex);
@@ -599,7 +604,8 @@ void *rp_osc_worker_thread(void *args)
             rp_osc_set_signals(rp_tmp_signals, long_acq_idx);
         }
         /* do not loop too fast */
-        usleep(10000);
+        //        usleep(10000);
+        usleep(500);
     }
 
     rp_clean_params(curr_params);
@@ -906,7 +912,8 @@ int rp_osc_auto_set(rp_app_params_t *orig_params,
             if(osc_fpga_triggered()) {
                 break;
             }
-            usleep(500);
+            //            usleep(500);
+            usleep(25);
         }
 
         /* Get the signals - available at rp_fpga_chX_signal vectors */
@@ -1087,7 +1094,8 @@ int rp_osc_auto_set(rp_app_params_t *orig_params,
                 if(osc_fpga_triggered()) {
                     break;
                 }    
-                usleep(500);
+                //                usleep(500);
+                usleep(25);
             }
 
             // Checking where acquisition starts
