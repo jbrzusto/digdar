@@ -194,7 +194,7 @@ int osc_fpga_exit(void)
  * FPGA module
  *
  * @param[in] trig_imm           nonzero if acquisition is applied immediately, zero if acquisition is trigger dependent
- * @param[in] trig_source        0 ChannelA, 1 ChannelB, 2 External, 3 digdar
+ * @param[in] trig_source        0 ChannelA, 1 ChannelB, 2 External, 3 digdar trigger, 4 digdar acp, 5 digdar arp
  * @param[in] trig_edge          0 Positive, 1 Negative edge
  * @param[in] trig_delay         Number of signal data atoms to be captured after the trigger
  * @param[in] trig_level         Trigger threshold level. expressed in [V]
@@ -531,8 +531,16 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
             fpga_trig_source = 7;
         break;
 
-    case 3: /* Digdar */
+    case 3: /* Digdar trigger */
       fpga_trig_source = 10;
+      break;
+
+    case 4: /* Digdar acp */
+      fpga_trig_source = 11;
+      break;
+
+    case 5: /* Digdar arp */
+      fpga_trig_source = 12;
       break;
 
     default:

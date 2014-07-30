@@ -110,6 +110,8 @@ typedef struct osc_fpga_reg_mem_s {
      *   8 - ASG positive edge
      *   9 - ASG negative edge
      *  10 - digdar counted trigger pulse
+     *  11 - digdar acp pulse
+     *  12 - digdar arp pulse
      * bits [31 : 4] -reserved
      */
     uint32_t trig_source;

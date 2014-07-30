@@ -49,9 +49,12 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
        *    0 - ChA
        *    1 - ChB
        *    2 - ext.
-       *    3 - digdar */
+       *    3 - digdar
+       *    4 - ACP line
+       *    5 - ARP line
+       */
 
-        "trig_source", 0, 1, 0,         0,         3 },
+        "trig_source", 0, 1, 0,         0,         5 },
     { /* trig_edge:
        *    0 - rising
        *    1 - falling */
@@ -179,9 +182,9 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
     { /* digdar_acp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
       "digdar_acp_latency", 125e3, 1, 0, 0, 1e8 },
     { /* digdar_arp_excite - ARP excitation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_arp_excite", 0.8, 1, 0, -1, 1 },
+      "digdar_arp_excite", 0.2, 1, 0, -1, 1 },
     { /* digdar_arp_relax -  ARP relaxation level in range -1..1 (units are relative to full ADC range) */
-      "digdar_arp_relax", 0.1, 1, 0, -1, 1 },
+      "digdar_arp_relax", 0.5, 1, 0, -1, 1 },
     { /* digdar_arp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
       "digdar_arp_latency", 125e6, 1, 0, 0, 1e8 },
     { /* digdar_acps_per_arp - number of ACPs per ARP for this radar (should be constant) */
