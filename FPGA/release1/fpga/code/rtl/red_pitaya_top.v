@@ -478,6 +478,8 @@ endgenerate
 
 wire trig_asg_out ;
 wire radar_trig ;
+wire acp_trig ;
+wire arp_trig ;
 wire adc_ready ;
    
    
@@ -491,6 +493,8 @@ red_pitaya_scope i_scope
   .trig_ext_i      (  exp_p_in[0]                ),  // external trigger
   .trig_asg_i      (  trig_asg_out               ),  // ASG trigger
   .radar_trig_i    (  radar_trig                 ),  // radar trigger (possibly delayed trigger from channel B)
+  .acp_trig_i      (  acp_trig                   ),  // acp trigger (slow ADC A)
+  .arp_trig_i      (  arp_trig                   ),  // arp trigger (slow ADC B)
  
   .xadc_a          (  xadc_a                     ),  // slow channel 1
   .xadc_b          (  xadc_b                     ),  // slow channel 2
@@ -728,7 +732,8 @@ red_pitaya_digdar i_digdar
   .adc_ready_i     (  adc_ready                  ),  // true when ADC armed but not yet triggered
  
   .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
- 
+  .acp_trig_o      (  acp_trig                   ),  // acp trigger
+  .arp_trig_o      (  arp_trig                   ),  // arp trigger 
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low

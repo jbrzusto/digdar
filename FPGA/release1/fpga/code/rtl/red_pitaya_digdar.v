@@ -93,6 +93,8 @@ module red_pitaya_digdar
    input                 adc_ready_i, //!< true when ADC is armed but not yet triggered
 
    output                radar_trig_o, //!< edge of radar trigger signal
+   output                acp_trig_o,   //!< edge of acp pulse
+   output                arp_trig_o,   //!< edge of arp pulse
 
            // system bus
    input                 sys_clk_i , //!< bus clock
@@ -145,9 +147,6 @@ reg [32-1: 0] saved_trig_count          ;
 reg [64-1: 0] saved_trig_clock          ;
 reg [64-1: 0] saved_trig_prev_clock     ;
 
-   wire       acp_trigger;
-   wire       arp_trigger;
-
    trigger_gen #( .width(12),
                              .counter_width(32),
                              .do_smoothing(1)
@@ -161,7 +160,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
       .thresh_relax(acp_thresh_relax), //signed
       .delay(0), 
       .latency(acp_latency),
-      .trigger(acp_trigger),
+      .trigger(acp_trig_o),
       .counter(acp_count)
       );
    
@@ -178,7 +177,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
       .thresh_relax(arp_thresh_relax), // signed
       .delay(0), 
       .latency(arp_latency),
-      .trigger(arp_trigger),
+      .trigger(arp_trig_o),
       .counter(arp_count)
       );
    
@@ -267,11 +266,11 @@ reg             ack          ;
       // keeping previous time
       clock_counter <= clock_counter + 64'b1; 
       
-      if (acp_trigger) begin
+      if (acp_trig_o) begin
          acp_clock           <= clock_counter;
          acp_prev_clock      <= acp_clock;
       end
-      if (arp_trigger) begin
+      if (arp_trig_o) begin
          arp_clock           <= clock_counter;
          arp_prev_clock      <= arp_clock;
          acp_per_arp         <= acp_count - prev_acp_count;
@@ -337,22 +336,22 @@ always @(*) begin
      `OFFSET_TRIG_PREV_CLOCK_LOW  : begin ack <= 1'b1;  rdata <= {               trig_prev_clock[32-1:0]  }; end
      `OFFSET_TRIG_PREV_CLOCK_HIGH : begin ack <= 1'b1;  rdata <= {               trig_prev_clock[64-1:32] }; end
 
-     `OFFSET_SAVED_ACP_COUNT            : begin ack <= 1'b1;  rdata <= {               saved_acp_count                }; end
-     `OFFSET_SAVED_ACP_CLOCK_LOW        : begin ack <= 1'b1;  rdata <= {               saved_acp_clock[32-1:0]        }; end
-     `OFFSET_SAVED_ACP_CLOCK_HIGH       : begin ack <= 1'b1;  rdata <= {               saved_acp_clock[64-1:32]       }; end
-     `OFFSET_SAVED_ACP_PREV_CLOCK_LOW   : begin ack <= 1'b1;  rdata <= {               saved_acp_prev_clock[32-1:0]   }; end
-     `OFFSET_SAVED_ACP_PREV_CLOCK_HIGH  : begin ack <= 1'b1;  rdata <= {               saved_acp_prev_clock[64-1:32]  }; end
-     `OFFSET_SAVED_ARP_COUNT            : begin ack <= 1'b1;  rdata <= {               saved_arp_count                }; end
-     `OFFSET_SAVED_ARP_CLOCK_LOW        : begin ack <= 1'b1;  rdata <= {               saved_arp_clock[32-1:0]        }; end
-     `OFFSET_SAVED_ARP_CLOCK_HIGH       : begin ack <= 1'b1;  rdata <= {               saved_arp_clock[64-1:32]       }; end
-     `OFFSET_SAVED_ARP_PREV_CLOCK_LOW   : begin ack <= 1'b1;  rdata <= {               saved_arp_prev_clock[32-1:0]   }; end
-     `OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  : begin ack <= 1'b1;  rdata <= {               saved_arp_prev_clock[64-1:32]  }; end
-     `OFFSET_SAVED_ACP_PER_ARP          : begin ack <= 1'b1;  rdata <= {               saved_acp_per_arp              }; end
-     `OFFSET_SAVED_TRIG_COUNT           : begin ack <= 1'b1;  rdata <= {               saved_trig_count               }; end
-     `OFFSET_SAVED_TRIG_CLOCK_LOW       : begin ack <= 1'b1;  rdata <= {               saved_trig_clock[32-1:0]       }; end
-     `OFFSET_SAVED_TRIG_CLOCK_HIGH      : begin ack <= 1'b1;  rdata <= {               saved_trig_clock[64-1:32]      }; end
-     `OFFSET_SAVED_TRIG_PREV_CLOCK_LOW  : begin ack <= 1'b1;  rdata <= {               saved_trig_prev_clock[32-1:0]  }; end
-     `OFFSET_SAVED_TRIG_PREV_CLOCK_HIGH : begin ack <= 1'b1;  rdata <= {               saved_trig_prev_clock[64-1:32] }; end
+     `OFFSET_SAVED_ACP_COUNT            : begin ack <= 1'b1;  rdata <= { saved_acp_count                }; end
+     `OFFSET_SAVED_ACP_CLOCK_LOW        : begin ack <= 1'b1;  rdata <= { saved_acp_clock[32-1:0]        }; end
+     `OFFSET_SAVED_ACP_CLOCK_HIGH       : begin ack <= 1'b1;  rdata <= { saved_acp_clock[64-1:32]       }; end
+     `OFFSET_SAVED_ACP_PREV_CLOCK_LOW   : begin ack <= 1'b1;  rdata <= { saved_acp_prev_clock[32-1:0]   }; end
+     `OFFSET_SAVED_ACP_PREV_CLOCK_HIGH  : begin ack <= 1'b1;  rdata <= { saved_acp_prev_clock[64-1:32]  }; end
+     `OFFSET_SAVED_ARP_COUNT            : begin ack <= 1'b1;  rdata <= { saved_arp_count                }; end
+     `OFFSET_SAVED_ARP_CLOCK_LOW        : begin ack <= 1'b1;  rdata <= { saved_arp_clock[32-1:0]        }; end
+     `OFFSET_SAVED_ARP_CLOCK_HIGH       : begin ack <= 1'b1;  rdata <= { saved_arp_clock[64-1:32]       }; end
+     `OFFSET_SAVED_ARP_PREV_CLOCK_LOW   : begin ack <= 1'b1;  rdata <= { saved_arp_prev_clock[32-1:0]   }; end
+     `OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  : begin ack <= 1'b1;  rdata <= { saved_arp_prev_clock[64-1:32]  }; end
+     `OFFSET_SAVED_ACP_PER_ARP          : begin ack <= 1'b1;  rdata <= { saved_acp_per_arp              }; end
+     `OFFSET_SAVED_TRIG_COUNT           : begin ack <= 1'b1;  rdata <= { saved_trig_count               }; end
+     `OFFSET_SAVED_TRIG_CLOCK_LOW       : begin ack <= 1'b1;  rdata <= { saved_trig_clock[32-1:0]       }; end
+     `OFFSET_SAVED_TRIG_CLOCK_HIGH      : begin ack <= 1'b1;  rdata <= { saved_trig_clock[64-1:32]      }; end
+     `OFFSET_SAVED_TRIG_PREV_CLOCK_LOW  : begin ack <= 1'b1;  rdata <= { saved_trig_prev_clock[32-1:0]  }; end
+     `OFFSET_SAVED_TRIG_PREV_CLOCK_HIGH : begin ack <= 1'b1;  rdata <= { saved_trig_prev_clock[64-1:32] }; end
      
      default                     : begin ack <= 1'b1;  rdata <= 32'h0                                    ; end
    endcase

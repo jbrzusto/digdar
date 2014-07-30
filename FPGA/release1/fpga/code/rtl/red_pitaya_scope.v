@@ -65,6 +65,8 @@ module red_pitaya_scope
    input      [ 12-1: 0] xadc_b          ,  //!< latest value from slow ADC 1
 
    input                 radar_trig_i    ,  //!< true for one cycle at start of radar trigger pulse
+   input                 acp_trig_i      ,  //!< true for one cycle at start of acp pulse
+   input                 arp_trig_i      ,  //!< true for one cycle at start of arp pulse
 
    output                adc_ready_o     ,  //!< true while armed but not yet triggered
 
@@ -344,7 +346,7 @@ always @(posedge adc_clk_i) begin
 
       if (wen && (addr[19:0]==20'h4))
          set_trig_src <= wdata[3:0] ;
-      else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
+      else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delay reached or reset
          set_trig_src <= 4'h0 ;
 
       case (set_trig_src)
@@ -358,6 +360,8 @@ always @(posedge adc_clk_i) begin
           4'd8 : adc_trig <= asg_trig_p    ; // ASG - rising edge
           4'd9 : adc_trig <= asg_trig_n    ; // ASG - falling edge
           4'd10: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
+          4'd11: adc_trig <= acp_trig_i    ; // trigger on slow channel A
+          4'd12: adc_trig <= arp_trig_i    ; // trigger on slow channel B
          
        default : adc_trig <= 1'b0          ;
       endcase
