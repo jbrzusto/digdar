@@ -30,7 +30,10 @@
   <script src="../assets/flot/jquery.flot.navigate.js"></script>
   <script src="../assets/flot/jquery.flot.resize.min.js"></script>
   <script src="../assets/flot/jquery.flot.touch.js?2"></script>
+  <link href="../assets/jquery-ui/jquery-ui.min.css" rel="stylesheet" type="text/css">
+  <script src="../assets/jquery-ui/jquery-ui.min.js"></script>
   <script src="../assets/jcanvas.min.js"></script>
+  <script src="../assets/jquery.nstSlider.min.js"></script>
   <script type="text/javascript">
   
   // Settings which can be modified
@@ -83,7 +86,6 @@
   var send_que = false;
   var use_long_timeout = false;
   var trig_dragging = false;
-  var acp_dragging = false;
   var touch_last_y = 0;
   var user_editing = false;
   var app_started = false;
@@ -128,7 +130,7 @@
     $('input, select, button', '.container').prop('disabled', true);
     
     // Events binding for trigger controls
-    
+
     $('#trigger_canvas').on({
       'mousedown touchstart': function(evt) {
       
@@ -154,26 +156,6 @@
       'mouseup mouseout touchend': mouseUpOut
     });
     
-    $('#acp_canvas').on({
-      'mousedown touchstart': function(evt) {
-            
-        acp_dragging = true;
-        $('input, select', '#accordion').blur();
-        mouseDownMove(this, evt);
-        evt.preventDefault();
-        return false;
-      },
-      'mousemove touchmove': function(evt) {
-        if(! acp_dragging) {
-          return;
-        }
-        mouseDownMove(this, evt);
-        evt.preventDefault();
-        return false;
-      },
-      'mouseup mouseout touchend': mouseUpOut
-    })
-
     $('input,select', '#accordion').on('focus', function() {
       user_editing = true;
     });
@@ -185,6 +167,9 @@
       autorun = (params.local.trig_mode == 2 ? 0 : 1); 
       runStop();
     });
+
+    $('#trigger_cnv_holder').slider({min:-1, max:1, orientation:"vertical", range:true, values:[0.2, 0.6], step:0.01});
+    
     
     $('#trig_source').on('change', function() { onDropdownChange($(this), 'trig_source'); });
     $('#trig_edge').on('change', function() { onDropdownChange($(this), 'trig_edge'); });
@@ -622,14 +607,14 @@
   fromCenter: false,
   align: "left"                                                  
 });  
-//       canv.drawArc({
-//   strokeStyle: '#000',
-//   strokeWidth: 5,
-//   x: 100, y: 100,
-//   radius: 50,
-//   // start and end angles in degrees
-//   start: 0, end: (params.original.digdar_acps_seen % 450) / 450 * 360
-// });                                               
+       canv.drawArc({
+   strokeStyle: '#000',
+   strokeWidth: 5,
+   x: 100, y: 100,
+   radius: 50,
+   // start and end angles in degrees
+   start: 0, end: (params.original.digdar_acps_seen % 450) / 450 * 360
+ });                                               
         }
         
         if(! trig_dragging) {
@@ -640,13 +625,14 @@
 
         if(autorun || dresult.status === 'AGAIN') {
           if(autorun) {
-            $('#btn_single').prop('disabled', true);
+            $('#btn_single_div').hide();
           }
           update_timer = setTimeout(function() {
             updateGraphData();
           }, update_interval);
         }
         else {
+          $('#btn_single_div').show();
           $('#btn_single').prop('disabled', false);
         }
       }
@@ -802,9 +788,14 @@
     // Autorun if trigger mode is Auto(0) or Normal(1), stop if it is Single(2)
     autorun = (params.original.trig_mode == 2 ? 0 : 1);
     
-    // Enable the Single button when not in autorun mode
-    $('#btn_single').prop('disabled', autorun);
-    
+    // Show the Single button when not in autorun mode
+    if (autorun) {
+       $('#btn_single_div').hide();
+    } else {
+       $('#btn_single_div').show();
+       $('#btn_single').prop('disabled', false);
+    }
+
     $('#trig_mode').val(params.original.trig_mode);
     $('#trig_source').val(params.original.trig_source);
     $('#trig_edge').val(params.original.trig_edge);
@@ -1022,7 +1013,7 @@
       }
     }
     // ...or trigger mode is not Normal
-    if(params.local.trig_mode != 1) {
+    if(params.local.trig_mode == 0) {
       return dsets;
     }
     // ...or trigger source is external
@@ -1075,10 +1066,11 @@
   
   function runStop() {
     if(autorun) {
-      $('#btn_single').prop('disabled', true);
+      $('#btn_single_div').hide();
       updateGraphData();
     }
     else {
+      $('#btn_single_div').show();
       $('#btn_single').prop('disabled', false);
       if(update_timer) {
         clearTimeout(update_timer);
@@ -1357,6 +1349,8 @@
     if(! plot) {
       return;
     }
+
+    return;
     
     var canvas = $('#trigger_canvas')[0];
     var context = canvas.getContext('2d');
@@ -1385,10 +1379,10 @@
       y = plot.getAxes().yaxis.p2c(tlev);
     }
     
-    // If trigger source is External or mode is not Normal or trigger level is not in visible area, do not show the trigger slider and paint the vertical line with gray
+    // If trigger source is External or mode is Continuous or trigger level is not in visible area, do not show the trigger slider and paint the vertical line with gray
     context.clearRect(0, 0, canvas.width, canvas.height); 
     var yaxis = plot.getAxes().yaxis;
-    if(params.original.trig_mode != 1 || tlev < yaxis.min || tlev > yaxis.max || params.original.trig_source == 2) {
+    if(params.original.trig_mode == 0 || tlev < yaxis.min || tlev > yaxis.max || params.original.trig_source == 2) {
       context.lineWidth = 1;
       context.strokeStyle = '#dddddd';
       context.stroke();
@@ -1410,106 +1404,9 @@
       context.lineTo(10, canvas.height - plot_offset.bottom + 1);
       context.stroke();
     }
-    $('#trigger_tooltip').css({ top: y + plot_offset.top });  
+//    $('#trigger_tooltip').css({ top: y + plot_offset.top });  
   }
   
-  function updateACPSlider(y, update_input) {
-    if(! plot) {
-      return;
-    }
-    
-    var canvas = $('#acp_canvas')[0];
-    var context = canvas.getContext('2d');
-    var plot_offset = plot.getPlotOffset();
-    var ymax = params.original.gui_reset_y_range / 2;
-    var ymin = ymax * -1;
-    
-    // Transform acp level to real values
-    // TODO: local or original params?
-
-    var scale = ymax;
-
-    var acpExcite = params.local.digdar_acp_excite * scale;
-
-    // If acp level is outside the predefined ymin/ymax, change the level
-    
-    if(acpExcite < ymin) {
-      acpExcite = ymin;
-    }
-    else if(acpExcite > ymax) {
-      acpExcite = ymax;
-    }
-    
-    if(y === undefined) {
-      if(update_input !== false) {
-        $('#acp_excite').not(':focus').val(floatToLocalString(acpExcite));
-      }
-      y = plot.getAxes().yaxis.p2c(acpExcite);
-    }
-
-    var acpRelax = params.local.digdar_acp_relax * scale;
-
-    // If acp level is outside the predefined ymin/ymax, change the level
-    
-    if(acpRelax < ymin) {
-      acpRelax = ymin;
-    }
-    else if(acpRelax > ymax) {
-      acpRelax = ymax;
-    }
-        
-    // If acp level is not in visible area, do not show the acp slider and paint the vertical line with gray
-    context.clearRect(0, 0, canvas.width, canvas.height); 
-    var yaxis = plot.getAxes().yaxis;
-    if((acpExcite < yaxis.min || acpExcite > yaxis.max) && (acpRelax < yaxis.min || acpRelax > yaxis.max)) {
-      context.lineWidth = 1;
-      context.strokeStyle = '#dddddd';
-      context.stroke();
-      context.beginPath();
-      context.moveTo(10, plot_offset.top);
-      context.lineTo(10, canvas.height - plot_offset.bottom + 1);
-      context.stroke();
-    }
-    else {
-      context.beginPath();
-      context.moveTo(10, plot_offset.top);
-      context.lineTo(10, canvas.height - plot_offset.bottom + 1);
-      context.stroke();
-      context.beginPath();
-      context.arc(10, y + plot_offset.top, 8, 0, 2 * Math.PI, false);                                               
-      context.fillStyle = '#ffffff';
-      context.fill();
-      context.strokeText("+", 5.5, y + plot_offset.top + 3);
-      context.lineWidth = 1;
-      context.strokeStyle = '#000077';
-      context.stroke();
-    }
-    $('#acp_tooltip').css({ top: y + plot_offset.top });  
-
-
-    if(update_input !== false) {
-         $('#acp_relax').not(':focus').val(floatToLocalString(acpRelax));
-    }
-    y = plot.getAxes().yaxis.p2c(acpRelax);
-    
-    var yaxis = plot.getAxes().yaxis;
-    if(acpRelax < yaxis.min || acpRelax > yaxis.max) {
-       // do nothing
-    }
-    else {
-      context.beginPath();
-      context.arc(10, y + plot_offset.top, 8, 0, 2 * Math.PI, false);                                               
-      context.fillStyle = '#ffffff';
-      context.fill();
-      context.strokeText("--", 5.5, y + plot_offset.top + 3);
-      context.lineWidth = 1;
-      context.strokeStyle = '#000077';
-      context.stroke();
-    }
-    $('#acp_tooltip').css({ top: y + plot_offset.top });  
-
-  }
-
   function updateRanges() {
     var xunit = (params.local.time_units == 0 ? 'μs' : (params.local.time_units == 1 ? 'ms' : 's'));
     var yunit = '';
@@ -1751,12 +1648,10 @@
         <div class="graph-holder well well-small">
           <div id="ytitle">Scale: -1 = min ... +1 = max</div>
           <div id="trigger_cnv_holder">
-            <canvas id="trigger_canvas" width="25" height="460"></canvas>
-            <div id="trigger_tooltip"></div>
-          </div>
-          <div id="acp_cnv_holder">
-            <canvas id="acp_canvas" width="25" height="460"></canvas>
-            <div id="acp_tooltip"></div>
+            <!-- <div id="trigger_slider" height="460"> -->
+            <!-- <\!-- <canvas id="trigger_canvas" width="25" height="460"></canvas> -\-> -->
+            <!-- <\!-- <div id="trigger_tooltip"></div> -\-> -->
+            <!-- </div> -->
           </div>
           <div id="plot_holder"></div>
           <div id="xtitle"></div>
@@ -1767,7 +1662,7 @@
           <div class="panel-heading">
             <h4 class="panel-title">
               <a data-toggle="collapse" href="#trigger">
-                Capture and Plot Data
+                Capture and Plot
               </a>
             </h4>
           </div>
@@ -1784,15 +1679,15 @@
                     </select>
                   </div>
                 </div>
-              <div class="row" style="padding: 7px 0 0;">
+              <div id="btn_single_div" class="row" style="padding: 7px 0 0;">
                 <div class="col-xs-4"> </div>
                 <div class="col-xs-5">
-                  <button id="btn_single" class="btn btn-primary" onclick="singleUpdate()" disabled>
+                  <button id="btn_single" class="btn btn-primary" onclick="singleUpdate()" >
                     <span class="glyphicon glyphicon-step-forward"></span> Capture One Pulse
                   </button>
                 </div>
               </div>
-                <div class="form-group" style="padding: 14px 0 0;">
+                <div class="form-group" style="padding: 7px 0 0;">
                   <label for="trig_source" class="col-xs-4 control-label">Pulses from:</label>
                   <div class="col-xs-8">
                     <select id="trig_source" class="form-control">
