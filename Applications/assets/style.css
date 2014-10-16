@@ -98,7 +98,7 @@ label {
   margin: 0 11px 0 10px;
 }
 #trigger_cnv_holder {
-  width: 25px; 
+  /* width: 25px;  */
   height: 460px; 
   float: right; 
   position: relative; 
@@ -106,20 +106,6 @@ label {
   padding: 0;
 }
 #trigger_tooltip {
-  position: absolute; 
-  top: 0; 
-  left: 15px;
-  white-space: nowrap;
-}
-#acp_cnv_holder {
-  width: 25px; 
-  height: 460px; 
-  float: right; 
-  position: relative; 
-  margin: 0; 
-  padding: 0;
-}
-#acp_tooltip {
   position: absolute; 
   top: 0; 
   left: 15px;
