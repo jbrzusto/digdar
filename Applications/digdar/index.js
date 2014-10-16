@@ -207,8 +207,8 @@ $(function() {
     $('#trig_source').on('change', function() { onDropdownChange($(this), 'trig_source'); });
     $('#trig_edge').on('change', function() { onDropdownChange($(this), 'trig_edge'); });
 
-    $('#relax_level #excite_level').on('focus', function() {user_editing=true;});
-    $('#relax_level #excite_level').on('blur', function() {user_editing=false;});
+    $('#relax_level,#excite_level').focus(function(e) {user_editing=true;});
+    $('#relax_level,#excite_level').blur(function(e) {user_editing=false;});
 
     // Events binding for range controls
     $('#range_x_minus, #range_x_plus').on('click', function () {
@@ -586,25 +586,32 @@ function updateGraphData() {
                     plot.setData(filterData(datasets, plot.width()));
                     plot.setupGrid();
                     plot.draw();
+                    $('#info_ch2_freq').html(convertHz(params.original.digdar_trig_rate));
+                    $('#info_ch2_capture_freq').html(convertHz(params.original.digdar_capture_rate));
+                    $('#info_ch2_period').html(convertSec(1.0 / params.original.digdar_trig_rate));
+                    $('#info_acp_rate').html(convertHz(params.original.digdar_acp_rate));
+                    var acpsPerArp = params.original.digdar_acps_per_arp;
+                    $('#info_acps_per_arp').html(acpsPerArp);
+                    $('#info_arp_rate').html(Math.round(params.original.digdar_arps_rate * 10) / 10);
                     var canv = $(".flot-base");
-                    canv.drawText({
-                        fillStyle: '#808080',
-                        strokeStyle: '#000',
-                        strokeWidth: 0,
-                        x: 20, y: 20,
-                        fontSize: 14,
-                        text: "Trigs seen: " + params.original.digdar_trigs_seen + "; rate: " + params.original.digdar_trig_rate + "Hz\nTrigs captured: " + params.original.digdar_trigs_captured + "; rate: " + params.original.digdar_capture_rate + "Hz",
-                        fromCenter: false,
-                        align: "left"                                                  
-                    });  
+                    var xc = 350, yc=225, radius=200;
                     canv.drawArc({
-                        strokeStyle: '#000',
-                        strokeWidth: 5,
-                        x: 100, y: 100,
-                        radius: 50,
+                        strokeStyle: 'rgba(255, 255, 0, 0.1)',
+                        fillStyle: 'rgba(255, 255, 0, 0.1)',
+                        strokeWidth: 1,
+                        closed: true,
+                        x: xc, y: yc,
+                        radius: radius,
                         // start and end angles in degrees
-                        start: 0, end: (params.original.digdar_acps_seen % 450) / 450 * 360
+                        start: 0, end: 360
                     });                                               
+                    canv.drawLine({
+                        strokeStyle: 'rgba(255, 255, 0, .4)',
+                        strokeWidth: 10,
+                        x1: xc + radius * Math.cos(2 * Math.PI * (params.original.digdar_acps_seen % acpsPerArp) / acpsPerArp),
+                        y1: yc + radius * Math.sin(2 * Math.PI * (params.original.digdar_acps_seen % acpsPerArp) / acpsPerArp),
+                        x2: xc, y2: yc
+                    });
                 }
                 
                 if(! trig_dragging) {
