@@ -1004,67 +1004,91 @@ function filterData(dsets, points) {
 // Add a data series for the trigger level lines
 function addTriggerDataSet(dsets) {
 
-    // Transform trigger level to real values
+    // Transform trigger levels to real values
     
-    var tlev = params.local.digdartrig_level;
+    var tlev = [params.local[exciteParamName(params.local.trig_source)], params.local[relaxParamName(params.local.trig_source)]];
     
     // Don't add trigger dataset if trigger level is outside the visible area...
     if(plot) {
         var yaxis = plot.getAxes().yaxis;
-        if(tlev < yaxis.min || tlev > yaxis.max) {
+        if((tlev[0] < yaxis.min || tlev[0] > yaxis.max) && (tlev[1] < yaxis.min || tlev[1] > yaxis.max)) {
             return dsets;
         }
     }
-    // ...or trigger mode is not Normal
+    // ...or trigger mode is continuous
     if(params.local.trig_mode == 0) {
         return dsets;
     }
-    // ...or trigger source is external
-    if(params.local.trig_source == 2) {
-        return dsets;
-    }
-    // ...or outside of received data for Y axis
-    var ch1ymin = null, 
-    ch1ymax = null;
-    // Find Y min/max values from data for first visible channel
-    for(var i=0; i<dsets[0].data.length; i++) {
-        ch1ymin = (ch1ymin === null || ch1ymin > dsets[0].data[i][1] ? dsets[0].data[i][1] : ch1ymin);
-        ch1ymax = (ch1ymax === null || ch1ymax < dsets[0].data[i][1] ? dsets[0].data[i][1] : ch1ymax);
-    }
-    if(dsets.length > 1) {
-        var ch2ymin = null, 
-        ch2ymax = null;
-        // Find Y min/max values from data for second visible channel
-        for(var i=0; i<dsets[1].data.length; i++) {
-            ch2ymin = (ch2ymin === null || ch2ymin > dsets[1].data[i][1] ? dsets[1].data[i][1] : ch2ymin);
-            ch2ymax = (ch2ymax === null || ch2ymax < dsets[1].data[i][1] ? dsets[1].data[i][1] : ch2ymax);
-        }
-        // Check if trigger level is outside of found values
-        if(tlev < Math.min(ch1ymin, ch2ymin) || tlev > Math.max(ch1ymax, ch2ymax)) {
-            return dsets;
-        }
-    }
-    else {
-        // Check if trigger level is outside of found values
-        if(tlev < ch1ymin || tlev > ch1ymax) {
-            return dsets;
-        }
-    }
+    // // ...or outside of received data for Y axis
+    // var ch1ymin = null, 
+    // ch1ymax = null;
+    // // Find Y min/max values from data for first visible channel
+    // for(var i=0; i<dsets[0].data.length; i++) {
+    //     ch1ymin = (ch1ymin === null || ch1ymin > dsets[0].data[i][1] ? dsets[0].data[i][1] : ch1ymin);
+    //     ch1ymax = (ch1ymax === null || ch1ymax < dsets[0].data[i][1] ? dsets[0].data[i][1] : ch1ymax);
+    // }
+    // if(dsets.length > 1) {
+    //     var ch2ymin = null, 
+    //     ch2ymax = null;
+    //     // Find Y min/max values from data for second visible channel
+    //     for(var i=0; i<dsets[1].data.length; i++) {
+    //         ch2ymin = (ch2ymin === null || ch2ymin > dsets[1].data[i][1] ? dsets[1].data[i][1] : ch2ymin);
+    //         ch2ymax = (ch2ymax === null || ch2ymax < dsets[1].data[i][1] ? dsets[1].data[i][1] : ch2ymax);
+    //     }
+    //     // Check if trigger level is outside of found values
+    //     if(tlev < Math.min(ch1ymin, ch2ymin) || tlev > Math.max(ch1ymax, ch2ymax)) {
+    //         return dsets;
+    //     }
+    // }
+    // else {
+    //     // Check if trigger level is outside of found values
+    //     if(tlev < ch1ymin || tlev > ch1ymax) {
+    //         return dsets;
+    //     }
+    // }
     
     var index = 0;
     var dxmin = 0;
     var dxmax = 1;
     
-    if(dsets.length && dsets[0].data[0]) {
-        index = dsets.length;
-        
+    index = dsets.length;
+    if(index && dsets[0].data[0]) {
         dxmin = dsets[0].data[0][0];
         dxmax = dsets[0].data[dsets[0].data.length - 1][0];
+    } else {
+        dxmin = xaxis.min;
+        dxmax = xaxis.max;
     }
-    //    dsets[index] = { color: 2, data: [[dxmin, tlev], [dxmax, tlev]], shadowSize: 1 };
-    dsets[index] = { color: 2, data: [[dxmin, tlev], [dxmax, tlev]], shadowSize: 0, dashes: {show: true}, lines: {show: false} };
+    
+    var np = 40;
+    var excitePts = new Array(np);
+    var relaxPts = new Array(np);
+    var xx = dxmin;
+    var dxx = (dxmax - dxmin) / (np - 1)
+    for (i = 0; i < np; ++i, xx += dxx) {
+        excitePts[i] = [xx, tlev[0]];
+        relaxPts[i] = [xx, tlev[1]];
+    }
+    var normal = tlev[1] >= tlev[0];
+    dsets[index] = { color: "rgb(0, 0, 0)", data: excitePts, shadowSize: 0, points: {show: true, fill:false, radius: 10, symbol:plusSign, lineWidth: 0.5 }, lines: {show: false} };
+    dsets[index+1] = { color: "rgb(0, 0, 0)", data: relaxPts, shadowSize: 0, points: {show: true, fill:false,radius: 10, symbol:minusSign, lineWidth: 0.5}, lines: {show: false} };
     
     return dsets;
+}
+
+function plusSign(ctx, x, y, radius, shadow) {
+    var r2 = radius/2;
+    ctx.moveTo(x, y - r2);
+    ctx.lineTo(x, y + r2);
+    ctx.moveTo(x - r2, y);
+    ctx.lineTo(x + r2, y);
+}
+
+function minusSign(ctx, x, y, radius, shadow) {
+// offset these by radius / 2 to the right so 
+// they can be seen when overlain directly on the plusSign symbols
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + radius, y);
 }
 
 function runStop() {
