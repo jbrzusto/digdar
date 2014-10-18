@@ -14,6 +14,9 @@ var start_app_url = root_url + '/bazaar?start=' + app_id;
 var stop_app_url = root_url + '/bazaar?stop=';
 var get_url = root_url + '/data';
 var post_url = root_url + '/data';
+var store_params_url = root_url + '/store_params';  // called with POST
+var load_params_url = root_url + '/load_params';  // called with GET
+var load_factory_params_url = root_url + '/load_factory_params';  // called with GET
 
 var update_interval = 50;              // Update interval for PC, milliseconds
 var update_interval_mobdev = 500;      // Update interval for mobile devices, milliseconds 
@@ -348,7 +351,7 @@ $(function() {
     
     // Modals
     
-    $('#modal_err, #modal_app').modal({ show: false, backdrop: 'static', keyboard: false });
+    $('#modal_err, #modal_app, #modal_confirm_store_params').modal({ show: false, backdrop: 'static', keyboard: false });
     
     $('#btn_switch_app').on('click', function() {
         var newapp_id = $('#new_app_id').text();
@@ -369,7 +372,69 @@ $(function() {
     $('.btn-close-modal').on('click', function() {
         $(this).closest('.modal').modal('hide');
     });
+
+    $('#btn_maybe_store_digdar_params').on('click', function() {
+        $('#modal_confirm_store_params').modal('show');
+    });
+
+    $('#btn_store_digdar_params').on('click', function() {
+        storeDigdarParams();
+        $('#modal_confirm_store_params').modal('hide');
+    });
+
+    $('#btn_cancel_store_digdar_params').on('click', function() {
+        $('#modal_confirm_store_params').modal('hide');
+    });
+
+    $('#btn_maybe_load_digdar_params').on('click', function() {
+        $('#modal_confirm_load_params').modal('show');
+    });
+
+    $('#btn_load_digdar_params').on('click', function() {
+        loadDigdarParams();
+        $('#modal_confirm_load_params').modal('hide');
+    });
+
+    $('#btn_cancel_load_digdar_params').on('click', function() {
+        $('#modal_confirm_load_params').modal('hide');
+    });
+
+    $('#btn_maybe_load_digdar_factory_params').on('click', function() {
+        $('#modal_confirm_load_factory_params').modal('show');
+    });
+
+    $('#btn_load_digdar_factory_params').on('click', function() {
+        loadDigdarFactoryParams();
+        $('#modal_confirm_load_factory_params').modal('hide');
+    });
+
+    $('#btn_cancel_load_digdar_factory_params').on('click', function() {
+        $('#modal_confirm_load_factory_params').modal('hide');
+    });
+
+    $('#btn_download_digdar_params').on('click', function() {
+        $('#input_json_params').val(JSON.stringify(params.local));
+        $('#frm_download_digdar_params').submit();
+    });
+
+    $('#btn_maybe_upload_digdar_params').on('click', function() {
+        $('#modal_upload_digdar_params').modal('show');
+    });
     
+    $('#btn_upload_digdar_params').on('click', function() {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            $('#modal_upload_digdar_params').modal('hide');
+            params.local = JSON.parse(e.target.result.toString());
+            sendParams();
+        };
+        reader.readAsText($('#input_upload_digdar_params')[0].files[0]);
+    });
+
+    $('#btn_cancel_upload_digdar_params').on('click', function() {
+        $('#modal_upload_digdar_params').modal('hide');
+    });
+
     // Other event bindings
     
     $('#trigger_tooltip').tooltip({
@@ -1056,6 +1121,7 @@ function addTriggerDataSet(dsets) {
         dxmin = dsets[0].data[0][0];
         dxmax = dsets[0].data[dsets[0].data.length - 1][0];
     } else {
+        var xaxis = plot.getAxes().xaxis;
         dxmin = xaxis.min;
         dxmax = xaxis.max;
     }
@@ -1627,4 +1693,29 @@ function convertSec(value) {
     
     value = (value == 0 ? '---' + decsep + '-' : floatToLocalString(value));
     return value + unit;
+}
+
+function storeDigdarParams() {
+    $.post(
+        store_params_url, 
+        JSON.stringify(params.local)
+    );
+}
+
+function loadDigdarParams() {
+    $.get(
+        load_params_url,
+        function(data) {
+            params.local = JSON.parse(data);
+        }
+    );
+}
+
+function loadDigdarFactoryParams() {
+    $.get(
+        load_factory_params_url,
+        function(data) {
+            params.local = JSON.parse(data);
+        }
+    );
 }

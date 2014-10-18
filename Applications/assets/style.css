@@ -97,13 +97,11 @@ label {
 #plot_holder.spectrum {
   margin: 0 11px 0 10px;
 }
-#trigger_cnv_holder {
-  /* width: 25px;  */
-  height: 460px; 
-  float: right; 
-  position: relative; 
-  margin: 0; 
-  padding: 0;
+.ui-spinner {
+  background-color: #FFFFFF;
+}
+.ui-spinner-input {
+  background-color: #FFFFFF;
 }
 #trigger_tooltip {
   position: absolute; 
@@ -275,4 +273,17 @@ fieldset[disabled] .btn-primary.active {
 .btn-primary .badge {
   color: #333434;
   background-color: #ffffff;
+}
+.fake-button-box {
+    text-align: center;
+    vertical-align: middle;
+    display: inline-block;
+    background: #fff;
+    color: #000;
+    border:1px solid #33842a;
+    border-radius: 10px;
+}
+.loadsave-grid-row {
+    text-align: center;
+    vertical-align: middle;
 }
