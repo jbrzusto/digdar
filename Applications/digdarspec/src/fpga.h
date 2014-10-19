@@ -1,13 +1,11 @@
 /**
- * $Id: fpga.h 881 2013-12-16 05:37:34Z rp_jmenart $
+ * $Id$
  *
- * @brief Red Pitaya Digdar FPGA Interface.
+ * @brief Red Pitaya Spectrum Analyzer FPGA Interface.
  *
  * @Author Jure Menart <juremenart@gmail.com>
- * @Author John Brzustowski <jbrzusto@fastmail.fm>
  *         
  * (c) Red Pitaya  http://www.redpitaya.com
- * (c) 2014 John Brzustowski 
  *
  * This part of code is written in C programming language.
  * Please visit http://en.wikipedia.org/wiki/C_(programming_language)
@@ -19,89 +17,56 @@
 
 #include <stdint.h>
 
+/* Housekeeping base address 0x40000000 */
+#define HK_FPGA_BASE_ADDR 0x40000000
+#define HK_FPGA_HW_REV_MASK 0x0000000f
 
-/** @defgroup fpga_h Acquisition
- * @{
- */
+typedef enum {
+	eHwRevC=0,
+	eHwRevD
+} hw_rev_t;
 
-/** Starting address of FPGA registers handling Oscilloscope module. */
-#define OSC_FPGA_BASE_ADDR 	0x40100000
-/** The size of FPGA registers handling Oscilloscope module. */
-#define OSC_FPGA_BASE_SIZE 0x50000
-/** Size of data buffer into which input signal is captured , must be 2^n!. */
-#define OSC_FPGA_SIG_LEN   (16*1024)
+/* FPGA housekeeping structure */
+typedef struct hk_fpga_reg_mem_s {
+    /* configuration:
+     * bit   [3:0] - hw revision
+     * bits [31:4] - reserved
+     */
+    uint32_t rev;
+    /* DNA low word */
+    uint32_t dna_lo;
+    /* DNA high word */
+    uint32_t dna_hi;
+} hk_fpga_reg_mem_t;
 
-/** Bit index in FPGA configuration register for arming the trigger. */
-#define OSC_FPGA_CONF_ARM_BIT  1
-/** Bit index in FPGA configuration register for reseting write state machine. */
-#define OSC_FPGA_CONF_RST_BIT  2
+/* Base address 0x40100000 */
+#define SPECTR_FPGA_BASE_ADDR 0x40100000
+#define SPECTR_FPGA_BASE_SIZE 0x30000
 
-/** Bit mask in the trigger_source register for depicting the trigger source type. */
-#define OSC_FPGA_TRIG_SRC_MASK 0x0000000f
-/** Bit mask in the cha_thr register for depicting trigger threshold on channel A. */
-#define OSC_FPGA_CHA_THR_MASK  0x00003fff
-/** Bit mask in the cha_thr register for depicting trigger threshold on channel B. */
-#define OSC_FPGA_CHB_THR_MASK  0x00003fff
-/** Bit mask in the trigger_delay register for depicting trigger delay. */
-#define OSC_FPGA_TRIG_DLY_MASK 0xffffffff
+#define SPECTR_FPGA_SIG_LEN   (16*1024)
 
-/** Offset to the memory buffer where signal on channel A is captured. */
-#define OSC_FPGA_CHA_OFFSET    0x10000
-/** Offset to the memory buffer where signal on channel B is captured. */
-#define OSC_FPGA_CHB_OFFSET    0x20000
-/** Offset to the memory buffer where signal on slow channel A is captured. */
-#define OSC_FPGA_XCHA_OFFSET   0x30000
-/** Offset to the memory buffer where signal on slow channel B is captured. */
-#define OSC_FPGA_XCHB_OFFSET   0x40000
+#define SPECTR_FPGA_CONF_ARM_BIT  1
+#define SPECTR_FPGA_CONF_RST_BIT  2
 
+#define SPECTR_FPGA_TRIG_SRC_MASK 0x00000007
+#define SPECTR_FPGA_CHA_THR_MASK  0x00003fff
+#define SPECTR_FPGA_CHB_THR_MASK  0x00003fff
+#define SPECTR_FPGA_TRIG_DLY_MASK 0xffffffff
+#define SPECTR_FPGA_DATA_DEC_MASK 0x0001ffff
 
-/** Starting address of FPGA registers handling the Digdar module. */
-#define DIGDAR_FPGA_BASE_ADDR 	0x40600000
-/** The size of FPGA register block handling the Digdar module. */
-#define DIGDAR_FPGA_BASE_SIZE 0x0000B8
+#define SPECTR_FPGA_CHA_OFFSET    0x10000
+#define SPECTR_FPGA_CHB_OFFSET    0x20000
 
-/** The offsets to the metadata (read-only-by client) in the FPGA register block
-    Must match values in red_pitaya_digdar.v from FPGA project
- */
-
-#define OFFSET_SAVED_TRIG_COUNT           0x00068 // (saved) TRIG count since reset (32 bits; wraps)
-#define OFFSET_SAVED_TRIG_CLOCK_LOW       0x0006C // (saved) clock at most recent TRIG (low 32 bits)
-#define OFFSET_SAVED_TRIG_CLOCK_HIGH      0x00070 // (saved) clock at most recent TRIG (high 32 bits)
-#define OFFSET_SAVED_TRIG_PREV_CLOCK_LOW  0x00074 // (saved) clock at previous TRIG (low 32 bits)
-#define OFFSET_SAVED_TRIG_PREV_CLOCK_HIGH 0x00078 // (saved) clock at previous TRIG (high 32 bits)
-#define OFFSET_SAVED_ACP_COUNT            0x0007C // (saved) ACP count since reset (32 bits; wraps)
-#define OFFSET_SAVED_ACP_CLOCK_LOW        0x00080 // (saved) clock at most recent ACP (low 32 bits)
-#define OFFSET_SAVED_ACP_CLOCK_HIGH       0x00084 // (saved) clock at most recent ACP (high 32 bits)
-#define OFFSET_SAVED_ACP_PREV_CLOCK_LOW   0x00088 // (saved) clock at previous ACP (low 32 bits)
-#define OFFSET_SAVED_ACP_PREV_CLOCK_HIGH  0x0008C // (saved) clock at previous ACP (high 32 bits)
-#define OFFSET_SAVED_ARP_COUNT            0x00090 // (saved) ARP count since reset (32 bits; wraps)
-#define OFFSET_SAVED_ARP_CLOCK_LOW        0x00094 // (saved) clock at most recent ARP (low 32 bits)
-#define OFFSET_SAVED_ARP_CLOCK_HIGH       0x00098 // (saved) clock at most recent ARP (high 32 bits)
-#define OFFSET_SAVED_ARP_PREV_CLOCK_LOW   0x0009C // (saved) clock at previous ARP (low 32 bits)
-#define OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  0x000A0 // (saved) clock at previous ARP (high 32 bits)
-#define OFFSET_SAVED_ACP_PER_ARP          0x000A4 // (saved) count of ACP pulses between two most recent ARP pulses                                  
-
-/** Hysteresis register default setting */
-
-#define OSC_HYSTERESIS 0x3F
-
-
-/** @brief FPGA registry structure for Oscilloscope core module.
- *
- * This structure is direct image of physical FPGA memory. It assures
- * direct read/write FPGA access when it is mapped to the appropriate memory address
- * through /dev/mem device.
- */
-typedef struct osc_fpga_reg_mem_s {
-    /** @brief  Configuration:
+typedef struct spectr_fpga_reg_mem_s {
+    /* configuration:
      * bit     [0] - arm_trigger
      * bit     [1] - rst_wr_state_machine
      * bits [31:2] - reserved 
      */
     uint32_t conf;
 
-    /** @brief  Trigger source:
-     * bits [ 3 : 0] - trigger source:
+    /* trigger source:
+     * bits [ 2 : 0] - trigger source:
      *   1 - trig immediately
      *   2 - ChA positive edge
      *   3 - ChA negative edge
@@ -109,35 +74,30 @@ typedef struct osc_fpga_reg_mem_s {
      *   5 - ChB negative edge
      *   6 - External trigger 0
      *   7 - External trigger 1 
-     *   8 - ASG positive edge
-     *   9 - ASG negative edge
-     *  10 - digdar counted trigger pulse
-     *  11 - digdar acp pulse
-     *  12 - digdar arp pulse
-     * bits [31 : 4] -reserved
+     * bits [31 : 3] -reserved
      */
     uint32_t trig_source;
 
-    /** @brief  ChA threshold:
+    /* ChA threshold:
      * bits [13: 0] - ChA threshold
      * bits [31:14] - reserved
      */
     uint32_t cha_thr;
 
-    /** @brief  ChB threshold:
+    /* ChB threshold:
      * bits [13: 0] - ChB threshold
      * bits [31:14] - reserved
      */
     uint32_t chb_thr;
 
-    /** @brief  After trigger delay:
+    /* After trigger delay:
      * bits [31: 0] - trigger delay 
      * 32 bit number - how many decimated samples should be stored into a buffer.
      * (max 16k samples)
      */
     uint32_t trigger_delay;
 
-    /** @brief  Data decimation
+    /* Data decimation
      * bits [16: 0] - decimation factor, legal values:
      *   1, 8, 64, 1024, 8192 65536
      *   If other values are written data is undefined 
@@ -145,31 +105,32 @@ typedef struct osc_fpga_reg_mem_s {
      */
     uint32_t data_dec;
 
-    /** @brief  Write pointers - both of the format:
+    /* Write pointers - both of the format:
      * bits [13: 0] - pointer
      * bits [31:14] - reserved
-     * Current pointer - where machine stopped writing after trigger
+     * Current pointer - where machine stopped writting after trigger
      * Trigger pointer - where trigger was detected 
      */
     uint32_t wr_ptr_cur;
     uint32_t wr_ptr_trigger;
-
-    /** @brief  ChA & ChB hysteresis - both of the format:
+    
+    /* ChA & ChB hysteresis - both of the format:
      * bits [13: 0] - hysteresis threshold
      * bits [31:14] - reserved
      */
     uint32_t cha_hystersis;
     uint32_t chb_hystersis;
 
-    /** @brief
+    /*
      * bits [0] - enable signal average at decimation
      * bits [31:1] - reserved
      */
     uint32_t other;
     
-    uint32_t reseved;
+    uint32_t reserved;
     
-    /** @brief ChA Equalization filter
+
+   /** @brief ChA Equalization filter
      * bits [17:0] - AA coefficient (pole)
      * bits [31:18] - reserved
      */
@@ -218,12 +179,17 @@ typedef struct osc_fpga_reg_mem_s {
      * bits [24:0] - PP coefficient (pole)
      * bits [31:25] - reserved
      */
-    uint32_t chb_filt_pp;            
+    uint32_t chb_filt_pp;                
     
-    
-    /** @brief  ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
+
+    /* ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
      * 0x20000 and are each 16k samples long */
-} osc_fpga_reg_mem_t;
+} spectr_fpga_reg_mem_t;
+
+/** Starting address of FPGA registers handling the Digdar module. */
+#define DIGDAR_FPGA_BASE_ADDR 	0x40600000
+/** The size of FPGA register block handling the Digdar module. */
+#define DIGDAR_FPGA_BASE_SIZE 0x0000B8
 
 typedef struct digdar_fpga_reg_mem_s {
 
@@ -486,52 +452,47 @@ typedef struct digdar_fpga_reg_mem_s {
 
 } digdar_fpga_reg_mem_t;
 
-/** @} */
+int spectr_fpga_init(void);
+int spectr_fpga_exit(void);
 
+int spectr_fpga_update_params(/*float trig_excite, float trig_relax, int trig_delay, int trig_latency,*/ int freq_range, int enable_avg_at_dec);
+int spectr_fpga_reset(void);
+int spectr_fpga_arm_trigger(void);
+int spectr_fpga_set_trigger(void);
 
-/* constants */
-extern const float c_osc_fpga_smpl_freq;
-extern const float c_osc_fpga_smpl_period;
-extern const int   c_osc_fpga_adc_bits;
-extern const int   c_osc_fpga_xadc_bits;
+/* Returns 0 if no trigger, 1 if trigger */
+int spectr_fpga_triggered(void);
 
+/* Returns pointer to the ChA and ChB signals (of length SPECTR_FPGA_SIG_LEN) */
+int spectr_fpga_get_sig_ptr(int **cha_signal, int **chb_signal);
 
-/* function declarations, detailed descriptions is in apparent implementation file  */
-int   osc_fpga_init(void);
-int   osc_fpga_exit(void);
-int   osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
-                             float trig_delay, float trig_level, int time_range,
-                             float ch1_adc_max_v, float ch2_adc_max_v,
-                             int ch1_calib_dc_off, float ch1_user_dc_off,
-                             int ch2_calib_dc_off, float ch2_user_dc_off,
-                             int ch1_probe_att, int ch2_probe_att,
-			      int ch1_gain, int ch2_gain,
-                             int enable_avg_at_dec,
-                             float trig_excite, float trig_relax, float digdar_trig_delay, float trig_latency,
-                             float acp_excite, float acp_relax, float acp_latency,
-                             float arp_excite, float arp_relax, float arp_latency,
-                             float acps_per_arp
-);
-int   osc_fpga_reset(void);
-int   osc_fpga_arm_trigger(void);
-int   osc_fpga_set_trigger(uint32_t trig_source);
-int   osc_fpga_set_trigger_delay(uint32_t trig_delay);
-int   osc_fpga_triggered(void);
-int   osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal, int **xchb_signal);
-int   osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
+/* Copies the last acquisition (trig wr. ptr -> curr. wr. ptr) */
+int spectr_fpga_get_signal(double **cha_signal, double **chb_signal);
 
-int   osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
-int   osc_fpga_cnv_time_range_to_dec(int time_range);
-int   osc_fpga_cnv_time_to_smpls(float time, int dec_factor);
-int   osc_fpga_cnv_v_to_cnt(float voltage, float max_adc_v,
-                            int calib_dc_off, float user_dc_off);
-float osc_fpga_cnv_cnt_to_v(int cnts, float max_adc_v,
-                            int calib_dc_off, float user_dc_off);
-float osc_fpga_cnv_xcnt_to_v(int cnts);
-float osc_fpga_cnv_cnt_to_rel(int cnts, int bits);
+/* Returns signal pointers from the FPGA */
+int spectr_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
 
-float osc_fpga_calc_adc_max_v(uint32_t fe_gain_fs, int probe_att);
+/* Returnes signal content */
+/* various constants */
+extern const float c_spectr_fpga_smpl_freq;
+extern const float c_spectr_fpga_smpl_period;
 
-int osc_fpga_get_digdar_ptr(uint32_t **digdar_memory);
+/* helper conversion functions */
+/* Converts freq_range parameter (0-5) to decimation factor */
+int spectr_fpga_cnv_freq_range_to_dec(int freq_range);
+/* Converts freq_range parameter (0-5) to unit enumerator */
+int spectr_fpga_cnv_freq_range_to_unit(int freq_range);
 
-#endif /* __FPGA_H */
+/* Converts time in [s] to ADC samples (depends on decimation) */
+int spectr_fpga_cnv_time_to_smpls(float time, int dec_factor);
+/* Converts voltage in [V] to ADC counts */
+int spectr_fpga_cnv_v_to_cnt(float voltage);
+/* Converts ADC ounts to [V] */
+float spectr_fpga_cnv_cnt_to_v(int cnts);
+
+/* debugging - will be removed */
+extern spectr_fpga_reg_mem_t *g_spectr_fpga_reg_mem;
+extern                int  g_spectr_fpga_mem_fd;
+int __spectr_fpga_cleanup_mem(void);
+
+#endif /* __FPGA_H*/

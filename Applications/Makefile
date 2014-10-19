@@ -5,7 +5,7 @@
 #
 
 # List of applications to build
-APPS=digdar scope scope+gen scope+pid spectrum freqanalyzer
+APPS=digdar digdarspec scope scope+gen scope+pid spectrum freqanalyzer
 
 
 all: zips

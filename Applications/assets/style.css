@@ -137,7 +137,7 @@ label {
   display: block;
   width: 100%;
   height: auto;
-  max-height: 100px;
+  max-height: 200px;
 }
 .waterfall_title {
   display: none;

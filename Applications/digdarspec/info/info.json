@@ -1,0 +1,6 @@
+{
+    "name": "Marine Radar Video Spectrum Analyzer",
+    "version": "0.1-0",
+    "revision": "devbuild",
+    "description": "Frequency domain A-scope display for marine radar video.  Brought to you by the makers of <a href=\"https://radr-project.org\">radr-project.org</a>"
+}
