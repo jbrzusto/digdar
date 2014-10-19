@@ -171,7 +171,6 @@ $(function() {
         var exciteName = exciteParamName(params.local.trig_source);
         if (exciteName != undefined) {
             params.local[exciteName] = level;
-//            redrawPlot();
             sendParams();
         }
         return true;
@@ -182,7 +181,6 @@ $(function() {
         var relaxName = relaxParamName(params.local.trig_source);
         if (relaxName != undefined) {
             params.local[relaxName] = level;
-//            redrawPlot();
             sendParams();
         }
         return true;
@@ -202,16 +200,26 @@ $(function() {
             }
         });
 
-    //    $('#excite_level_cnv_holder').slider({min:-1, max:1, orientation:"vertical", range:false, value:0.2, step:0.01, slide:handleExciteThreshSlider});
-    //    $('#relax_level_cnv_holder').slider({min:-1, max:1, orientation:"vertical", range:false, values:0.6, step:0.01, slide:handleRelaxThreshSlider});
-    
-    
+    function handleTrigDelay (event, ui) {
+        var level = ui.value || $('#digdar_trig_delay').spinner("value");
+        params.local.digdar_trig_delay = level / 8;
+        sendParams();
+        return true;
+    };
+
+
+    $('#digdar_trig_delay').spinner({min:0, max:1e8, step:8, page:80, value:0, spin:handleTrigDelay, change:handleTrigDelay})
+        .on('keypress', function(e) {
+            if(e.keyCode == 13) {
+                $(this).blur();
+            }
+        });    
     
     $('#trig_source').on('change', function() { onDropdownChange($(this), 'trig_source'); });
     $('#trig_edge').on('change', function() { onDropdownChange($(this), 'trig_edge'); });
 
-    $('#relax_level,#excite_level').focus(function(e) {user_editing=true;});
-    $('#relax_level,#excite_level').blur(function(e) {user_editing=false;});
+    $('#relax_level,#excite_level,#digdar_trig_delay').focus(function(e) {user_editing=true;});
+    $('#relax_level,#excite_level,#digdar_trig_delay').blur(function(e) {user_editing=false;});
 
     // Events binding for range controls
     $('#range_x_minus, #range_x_plus').on('click', function () {
@@ -504,29 +512,6 @@ function relaxParamName(trig_source) {
     return undefined;
 };
 
-function handleExciteLevel (event, ui) {
-    var level = $('#excite_level').spinner("value");
-    var exciteName = exciteParamName(params.local.trig_source);
-    if (exciteName != undefined) {
-        params.local[exciteName] = level;
-        redrawPlot();
-//        sendParams();
-    }
-    return true;
-};
-
-function handleRelaxLevel (event, ui) {
-    var level = $('#relax_level').spinner("value");
-    var relaxName = relaxParamName(params.local.trig_source);
-    if (relaxName != undefined) {
-        params.local[relaxName] = level;
-        redrawPlot();
-//        sendParams();
-    }
-    return true;
-};
-
-
 function startApp() {
     $.get(
         start_app_url
@@ -743,6 +728,11 @@ function updateGraphData() {
                     // Manage the state of other components
                     $('#accordion').find('input,select').not('#excite_level').not('#relax_level').not('#trig_source').prop('disabled', false);
                     $('.btn').not('#btn_single, #range_y_plus, #range_y_minus, #range_x_plus, #range_x_minus').prop('disabled', false);
+
+                    if (params.local.trig_source == 3)
+                        $('#digdar_trig_delay_div').show();
+                    else
+                        $('#digdar_trig_delay_div').hide();
                 }
             }
             
@@ -869,7 +859,8 @@ function loadParams(orig_params) {
     var scale = (params.original.trig_source == 0 ? params.original.scale_ch1 : params.original.scale_ch2);
     $('#excite_level').val(floatToLocalString(params.original[ exciteParamName(params.original.trig_source)] * scale));
     $('#relax_level').val(floatToLocalString(params.original[ relaxParamName(params.original.trig_source)] * scale));
-    
+    $('#digdar_trig_delay').val(floatToLocalString(params.original.digdar_trig_delay * 8));
+
     if ((refresh_counter++ % meas_panel_dec) == 0) {
         $('#info_ch1_min').html(floatToLocalString(shortenFloat(params.original.meas_min_ch1)));
         $('#info_ch1_max').html(floatToLocalString(shortenFloat(params.original.meas_max_ch1)));
