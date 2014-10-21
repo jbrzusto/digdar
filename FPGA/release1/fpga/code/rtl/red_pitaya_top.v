@@ -298,8 +298,11 @@ wire  [ 24-1: 0] dac_pwm_b   ;
 wire  [ 24-1: 0] dac_pwm_c   ;
 wire  [ 24-1: 0] dac_pwm_d   ;
 
-wire [ 12-1: 0] xadc_a      ;  // to store most recent value from slow ADCs
+wire [ 12-1: 0] xadc_a      ;  // most recent value from slow ADCs
 wire [ 12-1: 0] xadc_b      ;
+
+wire xadc_a_strobe      ;  //asserted for 1 sys_clk when slow ADC values have been read
+wire xadc_b_strobe      ;
    
 red_pitaya_analog i_analog
 (
@@ -652,6 +655,9 @@ red_pitaya_ams i_ams
   .xadc_a_o        (  xadc_a                     ),  // latest value from slow ADC a
   .xadc_b_o        (  xadc_b                     ),  // latest value from slow ADC b
 
+  .xadc_a_strobe_o   (  xadc_a_strobe                ),  // when slow ADC a value has been read
+  .xadc_b_strobe_o   (  xadc_b_strobe                ),  // when slow ADC b value has been read
+
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -728,6 +734,9 @@ red_pitaya_digdar i_digdar
   .adc_b_i         (  adc_b                      ),  // fast ADC channel B (for generating trigger)
   .xadc_a_i        (  xadc_a                     ),  // latest value from slow ADC a
   .xadc_b_i        (  xadc_b                     ),  // latest value from slow ADC b
+
+  .xadc_a_strobe_i   (  xadc_a_strobe                ),  // latest value from slow ADC a
+  .xadc_b_strobe_i   (  xadc_b_strobe                ),  // latest value from slow ADC b
 
   .adc_ready_i     (  adc_ready                  ),  // true when ADC armed but not yet triggered
  

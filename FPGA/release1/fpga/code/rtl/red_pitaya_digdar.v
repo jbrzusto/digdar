@@ -89,6 +89,8 @@ module red_pitaya_digdar
    input [ 14-1: 0]      adc_b_i,  //!< fast ADC channel B
    input [ 12-1: 0]      xadc_a_i, //!< most recent value from slow ADC channel A
    input [ 12-1: 0]      xadc_b_i, //!< most recent value from slow ADC channel B
+   input                 xadc_a_strobe_i, //!< trigger for most recent value from slow ADC channel A
+   input                 xadc_b_strobe_i, //!< most recent value from slow ADC channel B
 
    input                 adc_ready_i, //!< true when ADC is armed but not yet triggered
 
@@ -152,7 +154,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
                              .do_smoothing(1)
                              ) trigger_gen_acp  // not really a trigger; we're just counting these pulses
      (
-      .clock(adc_clk_i), 
+      .clock(adc_clk_i & xadc_a_strobe_i), 
       .reset(! adc_rstn_i),  // active low
       .enable(1'b1),
       .signal_in(xadc_a_i), // signed
@@ -169,7 +171,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
                              .do_smoothing(1)
                              ) trigger_gen_arp  // not really a trigger; we're just counting these pulses
      (
-      .clock(adc_clk_i), 
+      .clock(adc_clk_i & xadc_b_strobe_i), 
       .reset(! adc_rstn_i), // active low
       .enable(1'b1),
       .signal_in(xadc_b_i), // signed

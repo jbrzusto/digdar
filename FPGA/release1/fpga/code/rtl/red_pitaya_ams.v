@@ -60,6 +60,8 @@ module red_pitaya_ams
 
    output [ 12-1: 0] xadc_a_o , //!< save copy of latest slow adc value
    output [ 12-1: 0] xadc_b_o , //!< save copy of latest slow adc value
+   output            xadc_a_strobe_o, //!< indicate when slow adc value has been sampled
+   output            xadc_b_strobe_o, //!< indicate when slow adc value has been sampled
 
    // system bus
    input                 sys_clk_i , //!< bus clock
@@ -105,6 +107,11 @@ reg   [ 24-1: 0] dac_d_r      ;
 
 reg [ 12-1: 0] xadc_a_r     ;
 reg [ 12-1: 0] xadc_b_r     ;
+
+reg  adc_a_strobe_r     ;
+reg  adc_b_strobe_r     ;
+reg  xadc_a_strobe_r     ;
+reg  xadc_b_strobe_r     ;
    
 always @(posedge sys_clk_i) begin
    if (sys_rstn_i == 1'b0) begin
@@ -166,6 +173,8 @@ assign dac_d_o = dac_d_r ;
 assign xadc_a_o = xadc_a_r;
 assign xadc_b_o = xadc_b_r;
    
+assign xadc_a_strobe_o = xadc_a_strobe_r;
+assign xadc_b_strobe_o = xadc_b_strobe_r;
 
 
 
@@ -280,12 +289,28 @@ always @(posedge clk_i) begin
       if (xadc_drp_addr == 7'd24)   adc_a_r <= xadc_drp_dato[15:4]; // ch8 - aif0
       if (xadc_drp_addr == 7'd25)   adc_d_r <= xadc_drp_dato[15:4]; // ch9 - aif3
    end
+   if (xadc_drp_drdy) begin
+      if (xadc_drp_addr == 7'd24) begin
+         adc_a_strobe_r = 1'b1;
+      end
+      else begin
+        adc_a_strobe_r = 1'b0;
+      end
+      if (xadc_drp_addr == 7'd16) begin
+         adc_b_strobe_r = 1'b1;
+      end 
+      else begin
+        adc_b_strobe_r = 1'b0;
+      end
+   end      
 end
 
-   always @(posedge sys_clk_i) begin
-      xadc_a_r  <= adc_a_r;
-      xadc_b_r  <= adc_b_r;
-   end
+always @(posedge sys_clk_i) begin
+   xadc_a_r  <= adc_a_r;
+   xadc_b_r  <= adc_b_r;
+   xadc_a_strobe_r  <= adc_a_strobe_r;
+   xadc_b_strobe_r  <= adc_b_strobe_r;
+end
    
 
 
