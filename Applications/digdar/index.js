@@ -1,4 +1,3 @@
-
 // Settings which can be modified
 
 // handle jQuery plugin naming conflict between jQuery UI and Bootstrap
@@ -138,34 +137,6 @@ $(function() {
         runStop();
     });
 
-    function exciteParamName(trig_source) {
-        switch (trig_source) {
-        case 0:
-            return "trig_level";
-        case 3:
-            return "digdar_trig_excite";
-        case 4:
-            return "digdar_acp_excite";
-        case 5:
-            return "digdar_arp_excite";
-        }
-        return undefined;
-    };
-
-    function relaxParamName(trig_source) {
-        switch (trig_source) {
-        case 0:
-            return "trig_level";
-        case 3:
-            return "digdar_trig_relax";
-        case 4:
-            return "digdar_acp_relax";
-        case 5:
-            return "digdar_arp_relax";
-        }
-        return undefined;
-    };
-
     function handleExciteLevel (event, ui) {
         var level = ui.value || $('#excite_level').spinner("value");
         var exciteName = exciteParamName(params.local.trig_source);
@@ -208,7 +179,24 @@ $(function() {
     };
 
 
-    $('#digdar_trig_delay').spinner({min:0, max:1e8, step:8, page:80, value:0, spin:handleTrigDelay, change:handleTrigDelay})
+    $('#digdar_trig_delay').spinner({min:0, max:1e8, step:8, page:50, value:0, spin:handleTrigDelay, change:handleTrigDelay})
+        .on('keypress', function(e) {
+            if(e.keyCode == 13) {
+                $(this).blur();
+            }
+        });    
+
+    function handleLatencyLevel (event, ui) {
+        var level = ui.value || $('#digdar_latency').spinner("value");
+        var latencyName = latencyParamName(params.local.trig_source);
+        if (latencyName != undefined) {
+            params.local[latencyName] = level / 8;
+            sendParams();
+        }
+        return true;
+    };
+    
+    $('#digdar_latency').spinner({min:0, max:125e6, step:8, page:50, value:0, spin:handleLatencyLevel, change:handleLatencyLevel})
         .on('keypress', function(e) {
             if(e.keyCode == 13) {
                 $(this).blur();
@@ -216,10 +204,9 @@ $(function() {
         });    
     
     $('#trig_source').on('change', function() { onDropdownChange($(this), 'trig_source'); });
-    $('#trig_edge').on('change', function() { onDropdownChange($(this), 'trig_edge'); });
 
-    $('#relax_level,#excite_level,#digdar_trig_delay').focus(function(e) {user_editing=true;});
-    $('#relax_level,#excite_level,#digdar_trig_delay').blur(function(e) {user_editing=false;});
+    $('#relax_level,#excite_level,#digdar_trig_delay,#digdar_latency').focus(function(e) {user_editing=true;});
+    $('#relax_level,#excite_level,#digdar_trig_delay,#digdar_latency').blur(function(e) {user_editing=false;});
 
     // Events binding for range controls
     $('#range_x_minus, #range_x_plus').on('click', function () {
@@ -512,6 +499,19 @@ function relaxParamName(trig_source) {
     return undefined;
 };
 
+    function latencyParamName(trig_source) {
+        switch (trig_source) {
+        case 3:
+            return "digdar_trig_latency";
+        case 4:
+            return "digdar_acp_latency";
+        case 5:
+            return "digdar_arp_latency";
+        }
+        return undefined;
+    };
+
+
 function startApp() {
     $.get(
         start_app_url
@@ -733,6 +733,10 @@ function updateGraphData() {
                         $('#digdar_trig_delay_div').show();
                     else
                         $('#digdar_trig_delay_div').hide();
+                    if (params.local.trig_source != 2)
+                        $('#digdar_latency_div').show();
+                    else
+                        $('#digdar_latency_div').hide();
                 }
             }
             
@@ -860,6 +864,7 @@ function loadParams(orig_params) {
     $('#excite_level').val(floatToLocalString(params.original[ exciteParamName(params.original.trig_source)] * scale));
     $('#relax_level').val(floatToLocalString(params.original[ relaxParamName(params.original.trig_source)] * scale));
     $('#digdar_trig_delay').val(floatToLocalString(params.original.digdar_trig_delay * 8));
+    $('#digdar_latency').val(floatToLocalString(params.original[ latencyParamName(params.original.trig_source)] * 8));
 
     if ((refresh_counter++ % meas_panel_dec) == 0) {
         $('#info_ch1_min').html(floatToLocalString(shortenFloat(params.original.meas_min_ch1)));
