@@ -58,10 +58,10 @@ module red_pitaya_ams
    output [ 24-1: 0]     dac_c_o , //!< 
    output [ 24-1: 0]     dac_d_o , //!< 
 
-   output [ 12-1: 0] xadc_a_o , //!< save copy of latest slow adc value
-   output [ 12-1: 0] xadc_b_o , //!< save copy of latest slow adc value
-   output            xadc_a_strobe_o, //!< indicate when slow adc value has been sampled
-   output            xadc_b_strobe_o, //!< indicate when slow adc value has been sampled
+   output [ 12-1: 0] xadc_a_o , //!< save copy of latest slow adc value; adc_clock domain
+   output [ 12-1: 0] xadc_b_o , //!< save copy of latest slow adc value; adc_clock domain
+   output            xadc_a_strobe_o, //!< indicate when slow adc value has been sampled; adc_clock domain
+   output            xadc_b_strobe_o, //!< indicate when slow adc value has been sampled; adc_clock domain
 
    // system bus
    input                 sys_clk_i , //!< bus clock
@@ -284,36 +284,33 @@ always @(posedge clk_i) begin
       if (xadc_drp_addr == 7'd15)   adc_ddr_r  <= xadc_drp_dato[15:4]; // vccddr
 
       if (xadc_drp_addr == 7'h03)   adc_v_r <= xadc_drp_dato[15:4]; // vin
-      if (xadc_drp_addr == 7'd16)   adc_b_r <= xadc_drp_dato[15:4]; // ch0 - aif1
-      if (xadc_drp_addr == 7'd17)   adc_c_r <= xadc_drp_dato[15:4]; // ch1 - aif2
-      if (xadc_drp_addr == 7'd24)   adc_a_r <= xadc_drp_dato[15:4]; // ch8 - aif0
-      if (xadc_drp_addr == 7'd25)   adc_d_r <= xadc_drp_dato[15:4]; // ch9 - aif3
-   end
-   if (xadc_drp_drdy) begin
-      if (xadc_drp_addr == 7'd24) begin
-         adc_a_strobe_r = 1'b1;
-      end
-      else begin
-        adc_a_strobe_r = 1'b0;
-      end
+
       if (xadc_drp_addr == 7'd16) begin
+         adc_b_r <= xadc_drp_dato[15:4]; // ch0 - aif1
          adc_b_strobe_r = 1'b1;
       end 
       else begin
         adc_b_strobe_r = 1'b0;
       end
-   end      
+      if (xadc_drp_addr == 7'd17)   adc_c_r <= xadc_drp_dato[15:4]; // ch1 - aif2
+
+      if (xadc_drp_addr == 7'd24) begin
+         adc_a_r <= xadc_drp_dato[15:4]; // ch8 - aif0
+         adc_a_strobe_r = 1'b1;
+      end
+      else begin
+         adc_a_strobe_r = 1'b0;
+      end
+      if (xadc_drp_addr == 7'd25)   adc_d_r <= xadc_drp_dato[15:4]; // ch9 - aif3
+   end
 end
 
-always @(posedge sys_clk_i) begin
+always @(posedge clk_i) begin
+   // 1 clock lag introduced here
    xadc_a_r  <= adc_a_r;
    xadc_b_r  <= adc_b_r;
    xadc_a_strobe_r  <= adc_a_strobe_r;
    xadc_b_strobe_r  <= adc_b_strobe_r;
 end
    
-
-
-
-
 endmodule

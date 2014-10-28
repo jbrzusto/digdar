@@ -758,16 +758,9 @@ red_pitaya_digdar i_digdar
 );
 
 
-
-
-
-
-
-
-
 //---------------------------------------------------------------------------------
 //
-//  Power consumtion test
+//  Power consumption test
 
 red_pitaya_test i_test
 (
@@ -793,25 +786,6 @@ red_pitaya_test i_test
 //assign sys_rdata[ 7*32+31: 7*32] = 32'h0 ; 
 //assign sys_err[7] = 1'b0 ;
 //assign sys_ack[7] = 1'b1 ;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 endmodule
 

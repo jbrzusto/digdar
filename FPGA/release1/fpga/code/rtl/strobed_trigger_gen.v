@@ -48,10 +48,11 @@
 `define STATE_WAITING_EXCITE    2'd1  // waiting for signal to cross threshold in excitation direction
 `define STATE_DELAYING          2'd2  // threshold crossed; delaying before triggering
 
-module trigger_gen 
+module strobed_trigger_gen 
   ( input clock,
     input                          reset,
     input                          enable,
+    input                          strobe,   // only process signal_in when this line asserted
     input [width-1:0]              signal_in,
     input [width-1:0]              thresh_relax,
     input [width-1:0]              thresh_excite,
@@ -67,9 +68,9 @@ module trigger_gen
    parameter age_width     = 32;
    parameter do_smoothing  = 1;
    
-   reg [2-1:0]                     state;           // one of STATE values above
-   reg [delay_width-1:0]           delay_counter;   // countdown wait between trigger detection and assertion
-   reg [width-1:0]                 sig_smoothed;    // possibly smoothed version of signal_in
+   reg [2-1:0] 			   state;           // one of STATE values above
+   reg [delay_width-1:0] 	   delay_counter;   // countdown wait between trigger detection and assertion
+   reg [width-1:0] 		   sig_smoothed;    // possibly smoothed version of signal_in
    reg [age_width-1:0]             age;             // number of clock ticks since assertion of trigger
 
    reg [2-1:0]                     mode;            // one of MODE values above
@@ -77,17 +78,20 @@ module trigger_gen
    wire                            excited;         // true when smoothed signal is at or beyond excitation threshold, away from relaxation
    wire                            relaxed;         // true when smoothed signal is at or beyond relaxation threshold, away from excitation
    
-   
+    
    reg [width + 3 - 1: 0]          smoother;
 
    always @(posedge clock)
      begin
-        if ($signed(thresh_relax) < $signed(thresh_excite))
-          mode <= `MODE_NORMAL;
-        else if ($signed(thresh_relax) > $signed(thresh_excite))
-          mode <= `MODE_INVERTED;
-        else
-          mode <= `MODE_NOHYSTERESIS;
+        if (strobe)
+          begin
+             if ($signed(thresh_relax) < $signed(thresh_excite))
+               mode <= `MODE_NORMAL;
+             else if ($signed(thresh_relax) > $signed(thresh_excite))
+               mode <= `MODE_INVERTED;
+             else
+               mode <= `MODE_NOHYSTERESIS;
+          end
      end
 
    assign excited = ((mode == `MODE_NORMAL)       && $signed(sig_smoothed) >= $signed(thresh_excite)) ||
@@ -97,68 +101,71 @@ module trigger_gen
    assign relaxed = ((mode == `MODE_NORMAL)       && $signed(sig_smoothed) <= $signed(thresh_relax)) ||
                     ((mode == `MODE_INVERTED)     && $signed(sig_smoothed) >= $signed(thresh_relax)) ||
                     ((mode == `MODE_NOHYSTERESIS) && $signed(sig_smoothed) <  $signed(thresh_relax));
-   
+     
    always @(posedge clock)       
      if (reset | ~enable)
        begin
           state <= `STATE_WAITING_EXCITE;
 	  trigger <=  #1 1'b0;
-	  counter <=  #1 1'b0;
+	  counter <= #1 1'b0;
 	  sig_smoothed <=  signal_in;
           smoother <= {signal_in, 3'b0};
 	  age <=  latency;  // so that we don't wait for latency before the very first trigger
        end
      else
        begin
-	  age <= age + 1'b1;
+          if (strobe)
+            begin
+	       age <= age + 1'b1;
 
-          // smooth the signal with an IIR filter:  smooth[i+1] <= (7 * smooth[i] + value[i+1]) / 8
-          // FIXME: make the weighting a control parameter, instead of hardwiring 7/8, 1/8.
-          // Note the sign extension, as we treat signal as signed.
+               // smooth the signal with an IIR filter:  smooth[i+1] <= (7 * smooth[i] + value[i+1]) / 8
+               // FIXME: make the weighting a control parameter, instead of hardwiring 7/8, 1/8.
+               // Note the sign extension, as we treat signal as signed.
 
-          smoother[width + 3 - 1: 0] <= {sig_smoothed[width-1:0], 3'b0} - {{3{sig_smoothed[width - 1]}}, sig_smoothed[width-1:0]} + {{3{signal_in[width - 1]}}, signal_in[width - 1:0]};
+               smoother[width + 3 - 1: 0] <= {sig_smoothed[width-1:0], 3'b0} - {{3{sig_smoothed[width - 1]}}, sig_smoothed[width-1:0]} + {{3{signal_in[width - 1]}}, signal_in[width - 1:0]};
 
-	  sig_smoothed <= do_smoothing ? smoother[3 + width - 1 : 3] : signal_in;
+	       sig_smoothed <= do_smoothing ? smoother[3 + width - 1 : 3] : signal_in;
 
-	  case (state)
-	    `STATE_WAITING_RELAX:
-	      begin
-		 trigger <=  #1 1'b0;
-		 if (relaxed)
-		   begin
-		      state <=  `STATE_WAITING_EXCITE;
-		   end
-	      end
-            
-	    `STATE_WAITING_EXCITE:
-	      begin
-                 if (excited & age >= latency)
-		   begin
-		      age <=  1'b0;
-		      counter <=  #1 counter + 1'b1;
-		      if (delay == 0)
-			begin
-			   state <=  `STATE_WAITING_RELAX;
-			   trigger <= #1 1'b1;
-			end
-		      else
-			begin
-			   state <=  `STATE_DELAYING;
-			   delay_counter <=  delay;
-			end
-		   end
-              end
-	    
-	    `STATE_DELAYING:
-              if (| delay_counter)
-                begin
-		   delay_counter <= delay_counter - 1'b1;
-		end
-              else
-                begin
-		   state <=  `STATE_WAITING_RELAX;
-		   trigger <=  #1 1'b1;
-		end
-          endcase // case (state)
+	       case (state)
+	         `STATE_WAITING_RELAX:
+	           begin
+		      trigger <=  #1 1'b0;
+		      if (relaxed)
+		        begin
+		           state <=  `STATE_WAITING_EXCITE;
+		        end
+	           end
+                 
+	         `STATE_WAITING_EXCITE:
+	           begin
+                      if (excited & age >= latency)
+		        begin
+		           age <=  1'b0;
+		           counter <= #1 counter + 1'b1;
+		           if (delay == 0)
+			     begin
+			        state <=  `STATE_WAITING_RELAX;
+			        trigger <= #1 1'b1;
+			     end
+		           else
+			     begin
+			        state <=  `STATE_DELAYING;
+			        delay_counter <=  delay;
+			     end
+		        end
+                   end
+	         
+	         `STATE_DELAYING:
+                   if (| delay_counter)
+                     begin
+		        delay_counter <= delay_counter - 1'b1;
+		     end
+                   else
+                     begin
+		        state <=  `STATE_WAITING_RELAX;
+		        trigger <=  #1 1'b1;
+		     end
+               endcase // case (state)
+            end // if (strobe)
        end
 endmodule // red_pitaya_trigger_gen
