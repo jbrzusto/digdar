@@ -179,16 +179,16 @@ static rp_app_params_t rp_main_params[PARAMS_NUM+1] = {
       "digdar_acp_excite", 0.8, 1, 0, -1, 1 },
     { /* digdar_acp_relax -  ACP relaxation level in range -1..1 (units are relative to full ADC range) */
       "digdar_acp_relax", 0.1, 1, 0, -1, 1 },
-    { /* digdar_acp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
-      "digdar_acp_latency", 500e3, 1, 0, 0, 1e8 },
+    { /* digdar_acp_latency - minimum time delay (ADC clocks) between consecutive excitations */
+      "digdar_acp_latency", 31250, 1, 0, 0, 1e8 },
     { /* digdar_arp_excite - ARP excitation level in range -1..1 (units are relative to full ADC range) */
       "digdar_arp_excite", 0.2, 1, 0, -1, 1 },
     { /* digdar_arp_relax -  ARP relaxation level in range -1..1 (units are relative to full ADC range) */
       "digdar_arp_relax", 0.5, 1, 0, -1, 1 },
-    { /* digdar_arp_latency - minimum time delay (ADC clocks) between relaxation and next excitation */
+    { /* digdar_arp_latency - minimum time delay (ADC clocks) between consecutive excitations */
       "digdar_arp_latency", 125e6, 1, 0, 0, 1e8 },
     { /* digdar_acps_per_arp - number of ACPs per ARP for this radar (should be constant) */
-      "digdar_acps_per_arp", 450, 0, 0, 0, 16384 },
+      "digdar_acps_per_arp", 4096, 0, 0, 0, 16384 },
 
     // metadata - read only
 
