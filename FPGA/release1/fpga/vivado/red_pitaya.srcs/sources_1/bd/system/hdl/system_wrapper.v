@@ -1,7 +1,8 @@
 `timescale 1 ps / 1 ps
 
 module system_wrapper
-   (DDR_addr,
+   (Core0_nIRQ,
+    DDR_addr,
     DDR_ba,
     DDR_cas_n,
     DDR_ck_n,
@@ -30,6 +31,7 @@ module system_wrapper
     FIXED_IO_ps_clk,
     FIXED_IO_ps_porb,
     FIXED_IO_ps_srstb,
+    IRQ_F2P,
     M_AXI_GP0_araddr,
     M_AXI_GP0_arburst,
     M_AXI_GP0_arcache,
@@ -82,6 +84,7 @@ module system_wrapper
     SPI0_SS_I,
     SPI0_SS_O,
     SPI0_SS_T);
+  input Core0_nIRQ;
   inout [14:0]DDR_addr;
   inout [2:0]DDR_ba;
   inout DDR_cas_n;
@@ -111,6 +114,7 @@ module system_wrapper
   inout FIXED_IO_ps_clk;
   inout FIXED_IO_ps_porb;
   inout FIXED_IO_ps_srstb;
+  input [0:0]IRQ_F2P;
   output [31:0]M_AXI_GP0_araddr;
   output [1:0]M_AXI_GP0_arburst;
   output [3:0]M_AXI_GP0_arcache;
@@ -164,6 +168,7 @@ module system_wrapper
   output SPI0_SS_O;
   output SPI0_SS_T;
 
+  wire Core0_nIRQ;
   wire [14:0]DDR_addr;
   wire [2:0]DDR_ba;
   wire DDR_cas_n;
@@ -193,6 +198,7 @@ module system_wrapper
   wire FIXED_IO_ps_clk;
   wire FIXED_IO_ps_porb;
   wire FIXED_IO_ps_srstb;
+  wire [0:0]IRQ_F2P;
   wire [31:0]M_AXI_GP0_araddr;
   wire [1:0]M_AXI_GP0_arburst;
   wire [3:0]M_AXI_GP0_arcache;
@@ -247,7 +253,8 @@ module system_wrapper
   wire SPI0_SS_T;
 
 system system_i
-       (.DDR_addr(DDR_addr),
+       (.Core0_nIRQ(Core0_nIRQ),
+        .DDR_addr(DDR_addr),
         .DDR_ba(DDR_ba),
         .DDR_cas_n(DDR_cas_n),
         .DDR_ck_n(DDR_ck_n),
@@ -276,6 +283,7 @@ system system_i
         .FIXED_IO_ps_clk(FIXED_IO_ps_clk),
         .FIXED_IO_ps_porb(FIXED_IO_ps_porb),
         .FIXED_IO_ps_srstb(FIXED_IO_ps_srstb),
+        .IRQ_F2P(IRQ_F2P),
         .M_AXI_GP0_araddr(M_AXI_GP0_araddr),
         .M_AXI_GP0_arburst(M_AXI_GP0_arburst),
         .M_AXI_GP0_arcache(M_AXI_GP0_arcache),

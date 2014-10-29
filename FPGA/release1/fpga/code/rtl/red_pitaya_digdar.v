@@ -82,33 +82,33 @@
 
 module red_pitaya_digdar
 (
-   input                 adc_clk_i, //!< clock
-   input                 adc_rstn_i, //!< ADC reset - active low
+   input             adc_clk_i, //!< clock
+   input             adc_rstn_i, //!< ADC reset - active low
                                        // Slow ADC
 
-   input [ 14-1: 0]      adc_b_i,  //!< fast ADC channel B
-   input [ 12-1: 0]      xadc_a_i, //!< most recent value from slow ADC channel A
-   input [ 12-1: 0]      xadc_b_i, //!< most recent value from slow ADC channel B
-   input                 xadc_a_strobe_i, //!< strobe for most recent value from slow ADC channel A
-   input                 xadc_b_strobe_i, //!< strobe for most recent value from slow ADC channel B
+   input [ 14-1: 0]  adc_b_i, //!< fast ADC channel B
+   input [ 12-1: 0]  xadc_a_i, //!< most recent value from slow ADC channel A
+   input [ 12-1: 0]  xadc_b_i, //!< most recent value from slow ADC channel B
+   input             xadc_a_strobe_i, //!< strobe for most recent value from slow ADC channel A
+   input             xadc_b_strobe_i, //!< strobe for most recent value from slow ADC channel B
 
-   input                 adc_ready_i, //!< true when ADC is armed but not yet triggered
+   input             adc_ready_i, //!< true when ADC is armed but not yet triggered
 
-   output                radar_trig_o, //!< edge of radar trigger signal
-   output                acp_trig_o,   //!< edge of acp pulse
-   output                arp_trig_o,   //!< edge of arp pulse
+   output            radar_trig_o, //!< edge of radar trigger signal
+   output            acp_trig_o, //!< edge of acp pulse
+   output            arp_trig_o, //!< edge of arp pulse
 
            // system bus
-   input                 sys_clk_i , //!< bus clock
-   input                 sys_rstn_i , //!< bus reset - active low
-   input [ 32-1: 0]      sys_addr_i , //!< bus address
-   input [ 32-1: 0]      sys_wdata_i , //!< bus write data
-   input [ 4-1: 0]       sys_sel_i , //!< bus write byte select
-   input                 sys_wen_i , //!< bus write enable
-   input                 sys_ren_i , //!< bus read enable
-   output     [ 32-1: 0] sys_rdata_o , //!< bus read data
-   output                sys_err_o , //!< bus error indicator
-   output                sys_ack_o     //!< bus acknowledge signal
+   input             sys_clk_i , //!< bus clock
+   input             sys_rstn_i , //!< bus reset - active low
+   input [ 32-1: 0]  sys_addr_i , //!< bus address
+   input [ 32-1: 0]  sys_wdata_i , //!< bus write data
+   input [ 4-1: 0]   sys_sel_i , //!< bus write byte select
+   input             sys_wen_i , //!< bus write enable
+   input             sys_ren_i , //!< bus read enable
+   output [ 32-1: 0] sys_rdata_o , //!< bus read data
+   output            sys_err_o , //!< bus error indicator
+   output            sys_ack_o     //!< bus acknowledge signal
 
 );
 
@@ -149,7 +149,7 @@ reg [32-1: 0] saved_trig_count          ;
 reg [64-1: 0] saved_trig_clock          ;
 reg [64-1: 0] saved_trig_prev_clock     ;
 
-   strobed_trigger_gen #( .width(12),
+   trigger_gen #( .width(12),
                              .counter_width(32),
                              .do_smoothing(1)
                              ) trigger_gen_acp  // not really a trigger; we're just counting these pulses
@@ -167,7 +167,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
       .counter(acp_count)
       );
    
-   strobed_trigger_gen #( .width(12),
+   trigger_gen #( .width(12),
                              .counter_width(32),
                              .do_smoothing(1)
                              ) trigger_gen_arp  // not really a trigger; we're just counting these pulses
@@ -193,6 +193,7 @@ reg [64-1: 0] saved_trig_prev_clock     ;
       .clock(adc_clk_i), 
       .reset(! adc_rstn_i), // active low
       .enable(1'b1),
+      .strobe(1'b1),
       .signal_in(adc_b_i), // signed
       .thresh_excite(trig_thresh_excite), // signed
       .thresh_relax(trig_thresh_relax), // signed
@@ -218,7 +219,6 @@ wire            ren          ;
 reg  [ 32-1: 0] rdata        ;
 reg             err          ;
 reg             ack          ;
-   
 
    always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
@@ -247,7 +247,6 @@ reg             ack          ;
 
       arp_thresh_excite <= 12'h7ff;  // signed
       arp_thresh_relax  <= 12'h800;  // signed
-
       
    end // if (adc_rstn_i == 1'b0)
    else begin
@@ -284,7 +283,7 @@ reg             ack          ;
          trig_clock           <= clock_counter;
          trig_prev_clock      <= trig_clock;
       end
-
+      
       if (radar_trig_o & adc_ready_i) begin
          // we've been triggered and ADC is ready to write data to buffer
          // save copies of metadata registers for this pulse.  We require

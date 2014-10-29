@@ -739,7 +739,7 @@ red_pitaya_digdar i_digdar
   .xadc_b_strobe_i   (  xadc_b_strobe                ),  // latest value from slow ADC b
 
   .adc_ready_i     (  adc_ready                  ),  // true when ADC armed but not yet triggered
- 
+
   .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
   .acp_trig_o      (  acp_trig                   ),  // acp trigger
   .arp_trig_o      (  arp_trig                   ),  // arp trigger 
