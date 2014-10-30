@@ -23,6 +23,7 @@
 #include <math.h>
 #include <errno.h>
 
+#include "digdar.h"
 #include "main_digdar.h"
 #include "fpga_digdar.h"
 #include "worker.h"
@@ -46,11 +47,11 @@ static rp_osc_params_t rp_main_params[PARAMS_NUM] = {
     { /** trig_mode:
        *    0 - auto
        *    1 - normal
-       *    2 - single  */         0, 1, 0,         0,         2 },
+       *    2 - single  */         1, 1, 0,         0,         2 },
     { /** trig_source:
        *    0 - ChA
        *    1 - ChB
-       *    2 - ext.    */         0, 1, 0,         0,         2 },
+       *    2 - ext.    */         10, 1, 0,        1,         12 },
     { /** trig_edge:
        *    0 - rising
        *    1 - falling */         0, 1, 0,         0,         1 },
@@ -150,7 +151,6 @@ int rp_app_exit(void)
 int rp_set_params(float *p, int len)
 {
     int i;
-    int fpga_update = 1;
     int params_change = 0;
 
     if(len > PARAMS_NUM) {
@@ -164,8 +164,6 @@ int rp_set_params(float *p, int len)
 
         if(rp_main_params[i].value != p[i]) {
             params_change = 1;
-            if(rp_main_params[i].fpga_update)
-                fpga_update = 1;
         }
         if(rp_main_params[i].min_val > p[i]) {
             fprintf(stderr, "Incorrect parameters value: %f (min:%f), "
@@ -287,32 +285,7 @@ int rp_set_params(float *p, int len)
         rp_main_params[MIN_GUI_PARAM].value = t_start;
         rp_main_params[MAX_GUI_PARAM].value = t_stop;
 
-        rp_osc_worker_update_params((rp_osc_params_t *)&rp_main_params[0], 
-                                    fpga_update);
 
-        /* check if we need to change worker thread state */
-        switch(mode) {
-        case 0:
-            /* auto */
-            rp_osc_worker_change_state(rp_osc_auto_state);
-            break;
-        case 1:
-            /* normal */
-            rp_osc_worker_change_state(rp_osc_normal_state);
-            break;
-        case 2:
-            /* single - clear last ok buffer */
-            rp_osc_worker_change_state(rp_osc_idle_state);
-            rp_osc_clean_signals();
-            break;
-        default:
-            return -1;
-        }
-        if(rp_main_params[SINGLE_BUT_PARAM].value == 1) {
-            rp_main_params[SINGLE_BUT_PARAM].value = 0;
-            rp_osc_clean_signals();
-            rp_osc_worker_change_state(rp_osc_single_state);
-        }
     }
 
     return 0;
@@ -332,22 +305,11 @@ int rp_set_params(float *p, int len)
 int rp_get_params(float **p)
 {
     float *p_copy = NULL;
-    int t_unit_factor = 
-        rp_osc_get_time_unit_factor(rp_main_params[TIME_UNIT_PARAM].value);
-
-    int i;
 
     p_copy = (float *)malloc(PARAMS_NUM * sizeof(float));
     if(p_copy == NULL)
         return -1;
 
-    for(i = 0; i < PARAMS_NUM; i++)
-        p_copy[i] = rp_main_params[i].value;
-
-    p_copy[MIN_GUI_PARAM] = p_copy[MIN_GUI_PARAM] * t_unit_factor;
-    p_copy[MAX_GUI_PARAM] = p_copy[MAX_GUI_PARAM] * t_unit_factor;
-
-    *p = p_copy;
     return PARAMS_NUM;
 }
 
@@ -365,86 +327,11 @@ int rp_get_params(float **p)
  *            until it receives 0).
  * @retval 0 New signals returned
 */
-int rp_get_signals(float ***s, int *sig_num, int *sig_len)
-{
-    int ret_val;
-    int sig_idx;
 
-    if(*s == NULL)
+int rp_get_pulse(captured_pulse_t * pulse)
+{
+    if(pulse == NULL)
         return -1;
 
-    *sig_num = SIGNALS_NUM;
-    *sig_len = SIGNAL_LENGTH;
-
-    ret_val = rp_osc_get_signals(s, &sig_idx);
-
-    /* Not finished signal */
-    if((ret_val != -1) && sig_idx != SIGNAL_LENGTH-1) {
-        return -2;
-    }
-    /* Old signal */
-    if(ret_val < 0) {
-        return -1;
-    }
-
-    return 0;
-}
-
-/** @brief Creates signal structure
- *
- * This function creates signal vectors of the size SIGNALS_NUM x SIGNAL_LENGTH
- *
- * @param [out] a_signals Allocated signal vectors.
- *
- * @retval -1 Failure
- * @retval 0 Success
-*/
-int rp_create_signals(float ***a_signals)
-{
-    int i;
-    float **s;
-
-    s = (float **)malloc(SIGNALS_NUM * sizeof(float *));
-    if(s == NULL) {
-        return -1;
-    }
-    for(i = 0; i < SIGNALS_NUM; i++)
-        s[i] = NULL;
-
-    for(i = 0; i < SIGNALS_NUM; i++) {
-        s[i] = (float *)malloc(SIGNAL_LENGTH * sizeof(float));
-        if(s[i] == NULL) {
-            rp_cleanup_signals(a_signals);
-            return -1;
-        } else {
-          memset(&s[i][0], 0, SIGNAL_LENGTH * sizeof(float));
-        }
-    }
-    *a_signals = s;
-
-    return 0;
-}
-
-/** @brief Cleans up Oscilloscope signal vectors.
- * 
- * This function cleans up signal vectors used by Oscilloscope application.
- * 
- * @param [in] a_signals Signal vector of size SIGNAL_NUM x SIGNAL_LENGTH to be
- *                       cleaned.
- */
-void rp_cleanup_signals(float ***a_signals)
-{
-    int i;
-    float **s = *a_signals;
-
-    if(s) {
-        for(i = 0; i < SIGNALS_NUM; i++) {
-            if(s[i]) {
-                free(s[i]);
-                s[i] = NULL;
-            }
-        }
-        free(s);
-        s = NULL;
-    }
+    return rp_osc_get_pulse(pulse);
 }

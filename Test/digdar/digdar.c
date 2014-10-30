@@ -23,6 +23,7 @@
 #include <string.h>
 #include <sys/param.h>
 
+#include "digdar.h"
 #include "main_digdar.h"
 #include "fpga_digdar.h"
 #include "version.h"
@@ -53,7 +54,7 @@
 const char *g_argv0 = NULL;
 
 /** Minimal number of command line arguments */
-#define MINARGS 2
+#define MINARGS 0
 
 /** Oscilloscope module parameters as defined in main module
  * @see rp_main_params
@@ -63,60 +64,30 @@ float t_params[PARAMS_NUM] = { 0, 1e6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 /** Max decimation index */
 #define DEC_MAX 6
 
-/** Decimation translation table */
-static int g_dec[DEC_MAX] = { 1,  8,  64,  1024,  8192,  65536 };
-
 
 /** Print usage information */
 void usage() {
 
     const char *format =
             "\n"
-            "Usage: %s [OPTION]... SIZE <DEC>\n"
+            "Usage: %s [OPTION]\n"
             "\n"
-            "  --equalization  -e    Use equalization filter in FPGA (default: disabled).\n"
-            "  --shaping       -s    Use shaping filter in FPGA (default: disabled).\n"
-            "  --gain1=g       -1 g  Use Channel 1 gain setting g [lv, hv] (default: lv).\n"
-            "  --gain2=g       -2 g  Use Channel 2 gain setting g [lv, hv] (default: lv).\n"
+            "  --decim  -d    Decimation rate: one of 1 [default], 8, 64, or 1024\n"
+            "  --spp    -s    Samples per pulse. (Up to 16384; default is 4096)\n"
             "  --version       -v    Print version info.\n"
             "  --help          -h    Print this message.\n"
-            "\n"
-            "    SIZE                Number of samples to acquire [0 - %u].\n"
-            "    DEC                 Decimation [%u,%u,%u,%u,%u,%u] (default: 1).\n"
             "\n";
 
-    fprintf( stderr, format, g_argv0, SIGNAL_LENGTH,
-             g_dec[0],
-             g_dec[1],
-             g_dec[2],
-             g_dec[3],
-             g_dec[4],
-             g_dec[5]);
-}
-
-/** Gain string (lv/hv) to number (0/1) transformation */
-int get_gain(int *gain, const char *str)
-{
-    if ( (strncmp(str, "lv", 2) == 0) || (strncmp(str, "LV", 2) == 0) ) {
-        *gain = 0;
-        return 0;
-    }
-    if ( (strncmp(str, "hv", 2) == 0) || (strncmp(str, "HV", 2) == 0) ) {
-        *gain = 1;
-        return 0;
-    }
-
-    fprintf(stderr, "Unknown gain: %s\n", str);
-    return -1;
+    fprintf( stderr, format, g_argv0);
 }
 
 
-/** Acquire utility main */
+/** Acquire pulses main */
 int main(int argc, char *argv[])
 {
     g_argv0 = argv[0];
-    int equal = 0;
-    int shaping = 0;
+    int decim = 0;
+    int spp = 4096;
 
     if ( argc < MINARGS ) {
         usage();
@@ -126,15 +97,13 @@ int main(int argc, char *argv[])
     /* Command line options */
     static struct option long_options[] = {
             /* These options set a flag. */
-            {"equalization", no_argument,       0, 'e'},
-            {"shaping",      no_argument,       0, 's'},
-            {"gain1",        required_argument, 0, '1'},
-            {"gain2",        required_argument, 0, '2'},
+            {"decim", required_argument,       0, 'd'},
+            {"spp",      required_argument,       0, 's'},
             {"version",      no_argument,       0, 'v'},
             {"help",         no_argument,       0, 'h'},
             {0, 0, 0, 0}
     };
-    const char *optstring = "es1:2:vh";
+    const char *optstring = "d:s:vh";
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -143,37 +112,13 @@ int main(int argc, char *argv[])
     while ( (ch = getopt_long( argc, argv, optstring, long_options, &option_index )) != -1 ) {
         switch ( ch ) {
 
-        case 'e':
-            equal = 1;
+        case 'd':
+          decim = atoi(optarg);
             break;
 
         case 's':
-            shaping = 1;
+          spp = atoi(optarg);
             break;
-
-        /* Gain Channel 1 */
-        case '1':
-        {
-            int gain1;
-            if (get_gain(&gain1, optarg) != 0) {
-                usage();
-                return -1;
-            }
-            t_params[GAIN1_PARAM] = gain1;
-        }
-        break;
-
-        /* Gain Channel 2 */
-        case '2':
-        {
-            int gain2;
-            if (get_gain(&gain2, optarg) != 0) {
-                usage();
-                return -1;
-            }
-            t_params[GAIN2_PARAM] = gain2;
-        }
-        break;
 
         case 'v':
             fprintf(stdout, "%s version %s-%s\n", g_argv0, VERSION_STR, REVISION_STR);
@@ -191,46 +136,23 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* Acquisition size */
-    uint32_t size = 0;
-    if (optind < argc) {
-        size = atoi(argv[optind]);
-        if (size > SIGNAL_LENGTH) {
-            fprintf(stderr, "Invalid SIZE: %s\n", argv[optind]);
-            usage();
-            exit( EXIT_FAILURE );
-        }
-    } else {
-        fprintf(stderr, "SIZE parameter missing\n");
-        usage();
-        exit( EXIT_FAILURE );
+    if (decim == 1)
+      t_params[TIME_RANGE_PARAM] = 0;
+    else if (decim == 2)
+      t_params[TIME_RANGE_PARAM] = 1;
+    else {
+      fprintf(stderr, "incorrect value (%d) for decimation; must be 1 or 8\n", decim);
+      return -1;
     }
-    optind++;
-
-    /* Optional decimation */
-    if (optind < argc) {
-        uint32_t dec = atoi(argv[optind]);
-        uint32_t idx;
-
-        for (idx = 0; idx < DEC_MAX; idx++) {
-            if (dec == g_dec[idx]) {
-                break;
-            }
-        }
-
-        if (idx != DEC_MAX) {
-            t_params[TIME_RANGE_PARAM] = idx;
-        } else {
-            fprintf(stderr, "Invalid decimation DEC: %s\n", argv[optind]);
-            usage();
-            return -1;
-        }
+      
+    if (spp > 16384 || spp < 0) {
+      fprintf(stderr, "incorrect value (%d) for samples per pulse; must be 0..16384\n", spp);
+      return -1;
     }
 
-    /* Filter parameters */
-    t_params[EQUAL_FILT_PARAM] = equal;
-    t_params[SHAPE_FILT_PARAM] = shaping;
-
+    /* Standard radar triggering mode */
+    t_params[TRIG_MODE_PARAM] = 1;
+    t_params[TRIG_SRC_PARAM] = 10;
 
     /* Initialization of Oscilloscope application */
     if(rp_app_init() < 0) {
@@ -239,45 +161,21 @@ int main(int argc, char *argv[])
     }
 
     /* Setting of parameters in Oscilloscope main module */
+
+    // FIXME: load digdar params from JSON file, parse, and set
+
     if(rp_set_params((float *)&t_params, PARAMS_NUM) < 0) {
         fprintf(stderr, "rp_set_params() failed!\n");
         return -1;
     }
 
     {
-        float **s;
-        int sig_num, sig_len;
-        int i;
-        int ret_val;
-
-        int retries = 150000;
-
-        s = (float **)malloc(SIGNALS_NUM * sizeof(float *));
-        for(i = 0; i < SIGNALS_NUM; i++) {
-            s[i] = (float *)malloc(SIGNAL_LENGTH * sizeof(float));
-        }
-
-        while(retries >= 0) {
-            if((ret_val = rp_get_signals(&s, &sig_num, &sig_len)) >= 0) {
-                /* Signals acquired in s[][]:
-                 * s[0][i] - TODO
-                 * s[1][i] - Channel ADC1 raw signal
-                 * s[2][i] - Channel ADC2 raw signal
-                 * s[3][i] - Slow ADC Channel 1 raw signal
-                 * s[4][i] - Slow ADC Channel 1 raw signal 
-                */
-		
-                for(i = 0; i < MIN(size, sig_len); i++) {
-                  printf("%7d %7d %7d %7d\n", (int)s[1][i], (int)s[2][i], (int)s[3][i], (int)s[4][i]);
-                }
-                break;
-            }
-
-            if(retries-- == 0) {
-                fprintf(stderr, "Signal scquisition was not triggered!\n");
-                break;
-            }
-            usleep(1000);
+      captured_pulse_t pdata;
+      pdata.num_samples = spp;
+        while(1) {
+          if(rp_get_pulse(&pdata))
+            break;
+          write(fileno(stdout), &pdata, sizeof(pdata) - (16384 - pdata.num_samples) * sizeof(uint16_t));
         }
     }
 

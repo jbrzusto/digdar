@@ -15,14 +15,16 @@
  * for more details on the language used herein.
  */
 
-#ifndef __MAIN_OSC_H
-#define __MAIN_OSC_H
+#ifndef __MAIN_DIGDAR_H
+#define __MAIN_DIGDAR_H
 
-/** @defgroup main_osc_h main_osc_h
+#include "digdar.h"
+
+/** @defgroup main_digdar_h main_digdar_h
  * @{
  */
 
-/** @brief Oscilloscope parameters structure
+/** @brief radar pulse capture  parameters structure
  *
  * Oscilloscope parameter structure, which is a holder for parameters, defines
  * the behavior (if FPGA update is needed, if it is read only) and minimal and
@@ -84,10 +86,6 @@ int rp_app_init(void);
 int rp_app_exit(void);
 int rp_set_params(float *p, int len);
 int rp_get_params(float **p);
-int rp_get_signals(float ***s, int *sig_num, int *sig_len);
+int rp_get_pulse(captured_pulse_t * pulse);
 
-/* Internal helper functions */
-int  rp_create_signals(float ***a_signals);
-void rp_cleanup_signals(float ***a_signals);
-
-#endif /*  __MAIN_OSC_H */
+#endif /*  __MAIN_DIGDAR_H */

@@ -56,6 +56,10 @@
 /* internal structures */
 /** The FPGA register structure (defined in fpga_osc.h) */
 osc_fpga_reg_mem_t *g_osc_fpga_reg_mem = NULL;
+
+/* @brief Pointer to FPGA digdar control registers. */
+digdar_fpga_reg_mem_t *g_digdar_fpga_reg_mem = NULL;
+
 /** The FPGA input signal buffer pointer for channel A */
 uint32_t           *g_osc_fpga_cha_mem = NULL;
 /** The FPGA input signal buffer pointer for channel B */
@@ -177,6 +181,19 @@ int osc_fpga_init(void)
 
     g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
         (OSC_FPGA_XCHB_OFFSET / sizeof(uint32_t));
+
+    page_addr = DIGDAR_FPGA_BASE_ADDR & (~(page_size-1));
+    page_off  = DIGDAR_FPGA_BASE_ADDR - page_addr;
+
+    page_ptr = mmap(NULL, DIGDAR_FPGA_BASE_SIZE, PROT_READ | PROT_WRITE,
+                          MAP_SHARED, g_osc_fpga_mem_fd, page_addr);
+
+    if((void *)page_ptr == MAP_FAILED) {
+        fprintf(stderr, "mmap() failed: %s\n", strerror(errno));
+        __osc_fpga_cleanup_mem();
+        return -1;
+    }
+    g_digdar_fpga_reg_mem = page_ptr + page_off;
 
     return 0;
 }
@@ -471,8 +488,8 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
 
         break;
     default:
-        /* Error */
-        return -1;
+        /* Use usual radar trigger source */
+        return 10;
     }
 
     return fpga_trig_source;
