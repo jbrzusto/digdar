@@ -92,6 +92,8 @@ reg             err          ;
 reg             ack          ;
 reg             adc_arm_do   ;
 reg             adc_rst_do   ;
+reg             post_trig_only;
+   
 
 
 
@@ -246,8 +248,9 @@ always @(posedge adc_clk_i) begin
       adc_dly_do  <=  1'b0      ;
    end
    else begin
-      if (adc_arm_do)
-         adc_we <= 1'b1 ;
+      if (adc_arm_do) 
+        adc_we <= ~post_trig_only;
+//        adc_we <= 1'b1 ;
       else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
          adc_we <= 1'b0 ;
 
@@ -269,9 +272,15 @@ always @(posedge adc_clk_i) begin
 
 
       if (adc_trig)
-         adc_dly_do  <= 1'b1 ;
+        begin
+           adc_dly_do  <= 1'b1 ;
+           adc_we <= 1'b1;
+        end
       else if ((adc_dly_do && (adc_dly_cnt == 32'b0)) || adc_rst_do || adc_arm_do) //delayed reached or reset
-         adc_dly_do  <= 1'b0 ;
+        begin
+           adc_dly_do  <= 1'b0 ;
+           adc_we <= 1'b0;
+        end
 
       if (adc_dly_do && adc_we && adc_dv)
          adc_dly_cnt <= adc_dly_cnt + {32{1'b1}} ; // -1
@@ -335,6 +344,7 @@ always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
       adc_arm_do    <= 1'b0 ;
       adc_rst_do    <= 1'b0 ;
+      post_trig_only <= 1'b0;
       adc_trig_sw   <= 1'b0 ;
       set_trig_src  <= 4'h0 ;
       adc_trig      <= 1'b0 ;
@@ -575,6 +585,7 @@ always @(posedge adc_clk_i) begin
          if (addr[19:0]==20'h44)   set_b_filt_bb <= wdata[25-1:0] ;
          if (addr[19:0]==20'h48)   set_b_filt_kk <= wdata[25-1:0] ;
          if (addr[19:0]==20'h4C)   set_b_filt_pp <= wdata[25-1:0] ;
+         if (addr[19:0]==20'h50)   post_trig_only <= wdata[    0] ;
       end
    end
 end
@@ -610,6 +621,7 @@ always @(*) begin
      20'h00044 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_bb}      ; end
      20'h00048 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_kk}      ; end
      20'h0004C : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_pp}      ; end
+     20'h00050 : begin ack <= 1'b1;          rdata <= {{32-1{1'b0}},  post_trig_only}      ; end
 
      20'h1???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_a_rd}             ; end
      20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
