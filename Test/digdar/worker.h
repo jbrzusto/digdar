@@ -15,6 +15,9 @@
 #ifndef __WORKER_H
 #define __WORKER_H
 
+#include "pulse_metadata.h"
+#include "digdar.h"
+
 #include "fpga_digdar.h"
 extern digdar_fpga_reg_mem_t *g_digdar_fpga_reg_mem;
 
@@ -55,6 +58,7 @@ int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update);
  *  0 - no pulse captured
  *  1 - pulse captured
  */
-int rp_osc_get_pulse(captured_pulse_t *pulse);
+
+int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t timeout);
 
 #endif /* __WORKER_H*/

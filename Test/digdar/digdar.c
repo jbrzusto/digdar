@@ -27,6 +27,7 @@
 #include "main_digdar.h"
 #include "fpga_digdar.h"
 #include "version.h"
+#include "worker.h"
 
 /**
  * GENERAL DESCRIPTION:
@@ -168,16 +169,30 @@ int main(int argc, char *argv[])
         fprintf(stderr, "rp_set_params() failed!\n");
         return -1;
     }
+    int num_pulses = 4000;
+    pulse_metadata pm[num_pulses];
+    uint16_t data[spp];
 
     {
-      captured_pulse_t pdata;
-      pdata.num_samples = spp;
-        while(1) {
-          if(rp_get_pulse(&pdata))
-            break;
-          write(fileno(stdout), &pdata, sizeof(pdata) - (16384 - pdata.num_samples) * sizeof(uint16_t));
-        }
+      for(int i = 0; i < num_pulses; ++i) {
+        if(rp_osc_get_pulse(&pm[i], spp, &data[0], 0))
+          break;
+      }
     }
+    for (int i = 0; i < num_pulses; ++i) {
+      fprintf(stdout, "%d,%.6f,%d,%d,%.6f,%d,%.6f\n", 
+              i,
+              pm[i].trig_clock / 125.0e6,
+              pm[i].num_trig,
+              pm[i].num_acp,
+              pm[i].acp_clock / 125.0e6,
+              pm[i].num_arp,
+              pm[i].arp_clock / 125.0e6
+              );
+    }
+    puts("Last pulse:\n");
+    for (int i = 0; i < spp; ++i)
+      fprintf(stdout, "%d,%d\n", i, data[i]);
 
     if(rp_app_exit() < 0) {
         fprintf(stderr, "rp_app_exit() failed!\n");

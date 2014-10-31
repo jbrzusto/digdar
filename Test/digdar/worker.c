@@ -134,42 +134,82 @@ int rp_osc_worker_exit(void)
 
 /** @brief Returns a pulse of data
  * 
- * @param [out] pulse Pointer to captured_pulse_t data structure
+ * @param [out] pm Pointer to pulse_metadata structure. If null, no metdata are written.
+ *
+ * @param [in] ns Number of samples to grab for a pulse; 0...16384
+ *
+ * @param [out] data Pointer to location to store samples; must be allocated to hold at least ns samples.
+ * If null, no samples are written.
+ *
+ * @param [out] pm Pointer to pulse_metadata structure
+ *
+ * @param [in] timeout maximum wait time, in microseconds.  If zero, wait forever.
  *
  * @retval 0 okay.
- *         -1 no data.
+ *         -1 reached timeout without a pulse
 */
-int rp_osc_get_pulse(captured_pulse_t * pulse)
+
+int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t timeout)
 {
+  static int initial_arm = 0;
+
+  if (ns > 16384)
+    ns = 16384;
+
   /* set number of samples to collect after triggering */
-  osc_fpga_set_trigger_delay(pulse->num_samples);
+  osc_fpga_set_trigger_delay(ns);
 
   /* Start the writing machine */
-  osc_fpga_arm_trigger();
+  if (! initial_arm) {
+    osc_fpga_arm_trigger();
+    /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
+    osc_fpga_set_trigger(10);
+    initial_arm = 1;
+  }
         
-  /* Start the trigger - FIXME: standard radar trigger source*/
-  osc_fpga_set_trigger(10);
         
-  
   /* Sleep for a while, waiting for sample; imposes maximum PRF of
      10 kHz */
 
+  uint32_t waited = 0;
   for(;;) {
-    usleep(10);
+    const uint32_t single_wait = 10;  // wait 10 us at a time
     if(osc_fpga_triggered())
       break;
+    usleep(single_wait);
+    waited += single_wait;
+    if (timeout > 0 && waited >= timeout)
+      return -1;
   }
 
-  pulse->trig_clock = g_digdar_fpga_reg_mem->trig_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->trig_clock_high) << 32);
-  pulse->num_trigs = g_digdar_fpga_reg_mem->trig_count;
-  pulse->num_acp = g_digdar_fpga_reg_mem->acp_count;
-  pulse->acp_clock = g_digdar_fpga_reg_mem->acp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->acp_clock_high) << 32);
-  pulse->num_arp = g_digdar_fpga_reg_mem->arp_count;
-  pulse->arp_clock = g_digdar_fpga_reg_mem->arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->arp_clock_high) << 32);
+  if (pm) {
+    pm->trig_clock = g_digdar_fpga_reg_mem->trig_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->trig_clock_high) << 32);
+    pm->num_trig = g_digdar_fpga_reg_mem->trig_count;
+    pm->num_acp = g_digdar_fpga_reg_mem->acp_count;
+    pm->acp_clock = g_digdar_fpga_reg_mem->acp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->acp_clock_high) << 32);
+    pm->num_arp = g_digdar_fpga_reg_mem->arp_count;
+    pm->arp_clock = g_digdar_fpga_reg_mem->arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->arp_clock_high) << 32);
+  }
 
-  for (int i = 0; i < pulse->num_samples; ++i)
-    pulse->data[i] = rp_fpga_cha_signal[i];
+  int32_t tr_ptr;
+  osc_fpga_get_wr_ptr(0, &tr_ptr);
 
+  // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
+  // for this one.
+
+  osc_fpga_arm_trigger();
+  /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
+  osc_fpga_set_trigger(10);
+
+  if (data) {
+    int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
+    int32_t *max_data = & rp_fpga_cha_signal[16384];
+    for (uint16_t i = 0; i < ns; ++i) {
+      data[i] = *src_data++;
+      if (src_data == max_data)
+        src_data = & rp_fpga_cha_signal[0];
+    }
+  }
   return 0;
 }
 

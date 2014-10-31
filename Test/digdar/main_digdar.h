@@ -86,6 +86,5 @@ int rp_app_init(void);
 int rp_app_exit(void);
 int rp_set_params(float *p, int len);
 int rp_get_params(float **p);
-int rp_get_pulse(captured_pulse_t * pulse);
 
 #endif /*  __MAIN_DIGDAR_H */

@@ -35,6 +35,8 @@
 #define OSC_FPGA_CONF_ARM_BIT  1
 /** Bit index in FPGA configuration register for reseting write state machine. */
 #define OSC_FPGA_CONF_RST_BIT  2
+/** Bit index in FPGA configuration register for only writing after a trigger is detected */
+#define OSC_FPGA_POST_TRIG_ONLY  4
 
 /** Bit mask in the trigger_source register for depicting the trigger source type. */
 #define OSC_FPGA_TRIG_SRC_MASK 0x0000000f
@@ -219,8 +221,17 @@ typedef struct osc_fpga_reg_mem_s {
      * bits [31:25] - reserved
      */
     uint32_t chb_filt_pp;            
-    
-    
+
+    /** @brief Flag - only record samples after triggered
+     * bits [0] - if 1, only record samples after trigger detected
+     *            this serves to protect a digitized pulse, so that
+     *            we can be reading it from BRAM into DRAM while the FPGA
+     *            waits for and digitizes another pulse. (Provided the number
+     *            of samples to be digitized is <= 1/2 the buffer size of 16 k samples)
+     * bits [31:1] - reserved
+     */
+    uint32_t post_trig_only;
+  
     /** @brief  ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
      * 0x20000 and are each 16k samples long */
 } osc_fpga_reg_mem_t;

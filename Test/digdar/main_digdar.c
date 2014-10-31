@@ -313,25 +313,3 @@ int rp_get_params(float **p)
     return PARAMS_NUM;
 }
 
-/** @brief Returns signal vectors.
- * 
- * This function returns last available signal vectors.
- *
- * @param [out] s 2 dimensional signal vectors of format (sig_num x sig_len)
- * @param [out] sig_num Number of signals returned.
- * @param [out] sig_len Length of each signal returned.
- * 
- * @retval -1 Last available signal was returned (but was already once 
-              transmitted to the client).
- * @retval -2 Partial signal is returned (for long acquisition, client must poll
- *            until it receives 0).
- * @retval 0 New signals returned
-*/
-
-int rp_get_pulse(captured_pulse_t * pulse)
-{
-    if(pulse == NULL)
-        return -1;
-
-    return rp_osc_get_pulse(pulse);
-}

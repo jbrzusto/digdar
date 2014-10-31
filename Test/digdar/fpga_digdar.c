@@ -362,8 +362,8 @@ int osc_fpga_reset(void)
  */
 int osc_fpga_arm_trigger(void)
 {
-    g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
-
+  g_osc_fpga_reg_mem->post_trig_only = 1;
+  g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
     return 0;
 }
 
