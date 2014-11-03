@@ -329,7 +329,6 @@ red_pitaya_analog i_analog
   .adc_clk_o          (  adc_clk          ),  // ADC received clock
   .adc_rst_i          (  adc_rstn         ),  // reset - active low
   .ser_clk_o          (  ser_clk          ),  // fast serial clock
-
   .dac_dat_a_i        (  dac_a            ),  // DAC CH1
   .dac_dat_b_i        (  dac_b            ),  // DAC CH2
 
@@ -486,6 +485,7 @@ wire arp_trig ;
 wire adc_ready ;
    
    
+   
 red_pitaya_scope i_scope
 (
   // ADC
@@ -502,7 +502,7 @@ red_pitaya_scope i_scope
   .xadc_a          (  xadc_a                     ),  // slow channel 1
   .xadc_b          (  xadc_b                     ),  // slow channel 2
 
-  .adc_ready_o     (  adc_ready                  ),  // asserted while ADC armed but not triggered 
+  .adc_ready_o     (  adc_ready                  ),  // asserted while ADC armed but not triggered
 
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock

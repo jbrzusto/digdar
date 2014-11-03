@@ -69,7 +69,6 @@ module red_pitaya_scope
    input                 arp_trig_i      ,  //!< true for one cycle at start of arp pulse
 
    output                adc_ready_o     ,  //!< true while armed but not yet triggered
-
    // System bus
    input                 sys_clk_i       ,  //!< bus clock
    input                 sys_rstn_i      ,  //!< bus reset - active low
@@ -92,7 +91,8 @@ reg             err          ;
 reg             ack          ;
 reg             adc_arm_do   ;
 reg             adc_rst_do   ;
-reg             post_trig_only;
+reg [32-1:0]    post_trig_only;
+reg [ 32-1:0 ] bogus_reg   ;
    
 
 
@@ -116,21 +116,24 @@ reg  [ 25-1: 0] set_b_filt_pp  ;
 assign adc_a_filt_in = adc_a_i ;
 assign adc_b_filt_in = adc_b_i ;
 
-red_pitaya_dfilt1 i_dfilt1_cha
-(
-   // ADC
-  .adc_clk_i   ( adc_clk_i       ),  // ADC clock
-  .adc_rstn_i  ( adc_rstn_i      ),  // ADC reset - active low
-  .adc_dat_i   ( adc_a_filt_in   ),  // ADC data
-  .adc_dat_o   ( adc_a_filt_out  ),  // ADC data
+// red_pitaya_dfilt1 i_dfilt1_cha
+// (
+//    // ADC
+//   .adc_clk_i   ( adc_clk_i       ),  // ADC clock
+//   .adc_rstn_i  ( adc_rstn_i      ),  // ADC reset - active low
+//   .adc_dat_i   ( adc_a_filt_in   ),  // ADC data
+//   .adc_dat_o   ( adc_a_filt_out  ),  // ADC data
 
-   // configuration
-  .cfg_aa_i    ( set_a_filt_aa   ),  // config AA coefficient
-  .cfg_bb_i    ( set_a_filt_bb   ),  // config BB coefficient
-  .cfg_kk_i    ( set_a_filt_kk   ),  // config KK coefficient
-  .cfg_pp_i    ( set_a_filt_pp   )   // config PP coefficient
-);
+//    // configuration
+//   .cfg_aa_i    ( set_a_filt_aa   ),  // config AA coefficient
+//   .cfg_bb_i    ( set_a_filt_bb   ),  // config BB coefficient
+//   .cfg_kk_i    ( set_a_filt_kk   ),  // config KK coefficient
+//   .cfg_pp_i    ( set_a_filt_pp   )   // config PP coefficient
+// );
 
+   // no input filtering
+assign adc_a_filt_out = adc_a_filt_in;
+   
 red_pitaya_dfilt1 i_dfilt1_chb
 (
    // ADC
@@ -238,6 +241,8 @@ reg               adc_dly_do    ;
 
 assign adc_ready_o = adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
 
+assign negate = post_trig_only[1]; // extra bit: 1 means reverse range of ADC values.
+    
 // Write
 always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
@@ -250,7 +255,7 @@ always @(posedge adc_clk_i) begin
    end
    else begin
       if (adc_arm_do) 
-        adc_we <= ~post_trig_only;
+        adc_we <= ~post_trig_only[0];
 //        adc_we <= 1'b1 ;
       else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
          adc_we <= 1'b0 ;
@@ -293,7 +298,7 @@ end
 
 always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
-      adc_a_buf[adc_wp] <= adc_a_dat ;
+      adc_a_buf[adc_wp] <= negate ? {adc_a_dat[14-1], ~adc_a_dat[13-1:0]} : adc_a_dat ;
       adc_b_buf[adc_wp] <= adc_b_dat ;
       xadc_a_buf[adc_wp] <= xadc_a ;
       xadc_b_buf[adc_wp] <= xadc_b ;
@@ -345,7 +350,6 @@ always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
       adc_arm_do    <= 1'b0 ;
       adc_rst_do    <= 1'b0 ;
-      post_trig_only <= 1'b0;
       adc_trig_sw   <= 1'b0 ;
       set_trig_src  <= 4'h0 ;
       adc_trig      <= 1'b0 ;
@@ -566,6 +570,7 @@ always @(posedge adc_clk_i) begin
       set_b_filt_bb <=  25'h0      ;
       set_b_filt_kk <=  25'hFFFFFF ;
       set_b_filt_pp <=  25'h0      ;
+      post_trig_only <= 32'hfeadbee0;
       
    end
    else begin
@@ -586,7 +591,7 @@ always @(posedge adc_clk_i) begin
          if (addr[19:0]==20'h44)   set_b_filt_bb <= wdata[25-1:0] ;
          if (addr[19:0]==20'h48)   set_b_filt_kk <= wdata[25-1:0] ;
          if (addr[19:0]==20'h4C)   set_b_filt_pp <= wdata[25-1:0] ;
-         if (addr[19:0]==20'h50)   post_trig_only <= wdata[    0] ;
+         if (addr[19:0]==20'h50)   post_trig_only <= wdata[32-1:0] ; 
       end
    end
 end
@@ -622,7 +627,7 @@ always @(*) begin
      20'h00044 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_bb}      ; end
      20'h00048 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_kk}      ; end
      20'h0004C : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_pp}      ; end
-     20'h00050 : begin ack <= 1'b1;          rdata <= {{32-1{1'b0}},  post_trig_only}      ; end
+     20'h00050 : begin ack <= 1'b1;          rdata <= {post_trig_only}      ; end
 
      20'h1???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_a_rd}             ; end
      20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
