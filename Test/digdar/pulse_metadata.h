@@ -11,8 +11,10 @@
 
 #include <stdint.h>
 
+#define PULSE_METADATA_MAGIC 0xf00ff00fabcddcbaLL
+
 typedef struct {
-  uint64_t magic_number; // magic number for syncing headers  0xf00ff00fabcddcba
+  uint64_t magic_number; // magic number for syncing headers; stores PULSE_METADATA_MAGIC
   uint32_t num_trig;   // number of trigger pulses counted so far, regardless of the number digitized
   uint64_t trig_clock;  // ADC clock count (125 MHz) at which trigger pulse occurred
   uint32_t num_acp;     // number of ACP seen

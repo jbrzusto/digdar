@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
 
     for (int i = 0; i < num_pulses; ++i) {
       pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + i * psize);
-      pbm->magic_number = 0xf00ff00fabcddcbaLL;
+      pbm->magic_number = PULSE_METADATA_MAGIC;
     }
 
     //    rp_osc_worker_init();
