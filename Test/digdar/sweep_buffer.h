@@ -1,23 +1,9 @@
 /* -*- c++ -*- */
 /*
- * Copyright 2011 John Brzustowski
+ * Copyright 2011, 2014 John Brzustowski
  * 
- * This file is part of GNU Radio
+ * This file is part of digdar.
  * 
- * GNU Radio is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3, or (at your option)
- * any later version.
- * 
- * GNU Radio is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with GNU Radio; see the file COPYING.  If not, write to
- * the Free Software Foundation, Inc., 51 Franklin Street,
- * Boston, MA 02110-1301, USA.
  */
 
 #ifndef INCLUDED_SWEEP_BUFFER_H
@@ -31,17 +17,17 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/posix_time/posix_time_duration.hpp>
 #include <math.h>
-#include "usrp/usrp_marine_radar.h"
+#include "pulse_metadata.h"
 #include "sweep_metadata.h"
 
 typedef unsigned short t_sample;
 
 class sweep_buffer;  // forward declaration
-class usrp_pulse_buffer; // forward declaration
+class pulse_buffer; // forward declaration
 
 class sweep_buffer
 { 
- friend class usrp_pulse_buffer;
+ friend class pulse_buffer;
  friend class std::vector<sweep_buffer>;
 
  public:
@@ -98,7 +84,7 @@ private:
   t_buf_status                  status;			/**< status of the buffer */
   std::vector<t_sample>		samples;		/**< sample buffer */
   std::vector<pulse_metadata>	pmeta;			/**< pulse metadata buffer */
-  int				spp;			/**< samples per pulse sent by USRP */
+  int				spp;			/**< samples per pulse seen */
   unsigned int			i_next_pulse;		/**< index of next pulse slot in buffer to receive data */
   unsigned int			i_pulse_needing_ACP;	/**< index of latest pulse whose ACP interval needs to be updated */
 

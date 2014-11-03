@@ -35,13 +35,9 @@ typedef enum rp_osc_worker_state_e {
     /** requests an shutdown of the worker thread */
     rp_osc_quit_state,
     /* abort current measurement */
-    rp_osc_abort_state,
+    rp_osc_start_state,
     /* auto mode acquisition - continuous measurements without trigger */ 
-    rp_osc_auto_state, 
-    /* normal mode - continuous measurements with trigger */
-    rp_osc_normal_state,
-    /* single mode - one measurement with trigger then go to idle state */
-    rp_osc_single_state,
+    rp_osc_running_state, 
     /* non existing state - just to define the end of enumeration - must be
      * always last in the enumeration */
     rp_osc_nonexisting_state
@@ -60,5 +56,14 @@ int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update);
  */
 
 int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t timeout);
+
+extern uint16_t spp;  // samples to grab per radar pulse
+extern uint16_t decim; // decimation: 1, 2, or 8
+extern uint16_t num_pulses; // pulses to maintain in ring buffer (filled by worker thread)
+extern uint16_t chunk_size; // pulses to transmit per chunk (main thread)
+extern uint16_t cur_pulse; // index into pulses buffer
+extern uint32_t psize; // size of each pulse's storage
+
+extern pulse_metadata *pulse_buffer;
 
 #endif /* __WORKER_H*/

@@ -167,6 +167,7 @@ int osc_fpga_init(void)
         return -1;
     }
 
+
     /* Set FPGA OSC module pointers to correct values. */
     g_osc_fpga_reg_mem = page_ptr + page_off;
 
@@ -269,7 +270,7 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  * @param [in] trig_edge Trigger edge, as defined in rp_main_params.
  * @param [in] trig_delay Trigger delay in [s].
  * @param [in] trig_level Trigger level in [V].
- * @param [in] time_range Time range, as defined in rp_main_params.
+ * @param [in] decim_index Decimation index, as defined in rp_main_params.
  * @param [in] equal    Enable(1)/disable(0) equalization filter.
  * @param [in] shaping  Enable(1)/disable(0) shaping filter.
  * @param [in] gain1    Gain setting for Channel1 (0 = LV, 1 = HV).
@@ -282,12 +283,12 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  * @see rp_main_params
  */
 int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
-                           float trig_delay, float trig_level, int time_range,
+                           float trig_delay, float trig_level, int decim_index,
                            int equal, int shaping, int gain1, int gain2)
 {
     int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source, 
                                                     trig_edge);
-    int fpga_dec_factor = osc_fpga_cnv_time_range_to_dec(time_range);
+    int fpga_dec_factor = osc_fpga_cnv_decim_index_to_dec(decim_index);
     int fpga_delay;
     float after_trigger; /* how much after trigger FPGA should write */
     int fpga_trig_thr = osc_fpga_cnv_v_to_cnt(trig_level);
@@ -327,7 +328,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
 
     g_osc_fpga_reg_mem->data_dec      = fpga_dec_factor;
     g_osc_fpga_reg_mem->trigger_delay = (uint32_t)fpga_delay;
-    
+
     /* Update equalization filter with desired coefficients. */
     g_osc_fpga_reg_mem->cha_filt_aa = cha_filt.aa;
     g_osc_fpga_reg_mem->cha_filt_bb = cha_filt.bb;
@@ -362,7 +363,7 @@ int osc_fpga_reset(void)
  */
 int osc_fpga_arm_trigger(void)
 {
-  g_osc_fpga_reg_mem->post_trig_only = 1;
+  g_osc_fpga_reg_mem->post_trig_only = 3;  // 1: only buffer samples *after* being triggered; 2: negate range of sample values
   g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
     return 0;
 }
@@ -495,39 +496,41 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
     return fpga_trig_source;
 }
 
-/** @brief Converts time range to decimation value.
+/** @brief Converts decimation index to decimation value.
  *
- * This function converts time range value defined by rp_main_params to 
- * decimation factor value.
+ * This function converts the decimation mode index to an actual decimation factor.
  *
- * @param [in] time_range Time range, integer between 0 and 5, as defined by
- *                        rp_main_params.
+ * @param [in] decim_index Decimation factor, integer between 0 and 6, as defined by
+ *             rp_main_params.
  * 
  * @retval -1 Error
  *
  * @retval otherwise Decimation factor.
 */
-int osc_fpga_cnv_time_range_to_dec(int time_range)
+int osc_fpga_cnv_decim_index_to_dec(int decim_index)
 {
-    /* Input: 0, 1, 2, 3, 4, 5 translates to:
-     * Output: 1x, 8x, 64x, 1kx, 8kx, 65kx */
-    switch(time_range) {
+    /* Input: 0, 1, 2, 3, 4, 5, 6 translates to:
+     * Output: 1x, 2x, 8x, 64x, 1kx, 8kx, 65kx */
+    switch(decim_index) {
     case 0:
         return 1;
         break;
     case 1:
-        return 8;
+        return 2;
         break;
     case 2:
-        return 64;
+        return 8;
         break;
     case 3:
-        return 1024;
+        return 64;
         break;
     case 4:
-        return 8*1024;
+        return 1024;
         break;
     case 5:
+        return 8*1024;
+        break;
+    case 6:
         return 64*1024;
         break;
     default:

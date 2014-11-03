@@ -60,14 +60,14 @@ static rp_osc_params_t rp_main_params[PARAMS_NUM] = {
     { /** single_button:
        *    0 - ignore 
        *    1 - trigger */         0, 1, 0,         0,         1 },
-    { /** time_range:
-       *  decimation:
+    { /** decimation:
        *    0 - 1x
-       *    1 - 8x
-       *    2 - 64x
-       *    3 - 1kx
-       *    4 - 8kx
-       *    5 - 65kx   */          0, 1, 0,         0,         5 },
+       *    1 - 2x
+       *    2 - 8x
+       *    3 - 64x
+       *    4 - 1kx
+       *    5 - 8kx
+       *    6 - 65kx   */          0, 1, 0,         0,         6 },
     { /** time_unit_used:
        *    0 - [us]
        *    1 - [ms]
@@ -182,10 +182,9 @@ int rp_set_params(float *p, int len)
     if(params_change) {
         /* First do health check and then send it to the worker! */
         int mode = rp_main_params[TRIG_MODE_PARAM].value;
-        int time_range = rp_main_params[TIME_RANGE_PARAM].value;
-        int time_unit = 2;
+        int decim_index = rp_main_params[DECIM_INDEX_PARAM].value;
         /* Get info from FPGA module about clocks/decimation, ...*/
-        int dec_factor = osc_fpga_cnv_time_range_to_dec(time_range);
+        int dec_factor = osc_fpga_cnv_decim_index_to_dec(decim_index);
         float smpl_period = c_osc_fpga_smpl_period * dec_factor;
         /* t_delay - trigger delay in seconds */
         float t_delay = rp_main_params[TRIG_DLY_PARAM].value;
@@ -208,22 +207,6 @@ int rp_set_params(float *p, int len)
         /* if AUTO reset trigger delay */
         if(mode == 0) 
             t_delay = 0;
-
-        if(dec_factor < 0) {
-            fprintf(stderr, "Incorrect time range: %d\n", time_range);
-            return -1;
-        }
-
-        /* pick correct - which time unit is selected */
-        if((time_range == 0) || (time_range == 1)) {
-            time_unit     = 0;
-            t_unit_factor = 1e6;
-        } else if((time_range == 2) || (time_range == 3)) {
-            time_unit     = 1;
-            t_unit_factor = 1e3;
-        } 
-
-        rp_main_params[TIME_UNIT_PARAM].value = time_unit;
 
         /* Check if trigger delay in correct range, otherwise correct it
          * Correct trigger delay is:

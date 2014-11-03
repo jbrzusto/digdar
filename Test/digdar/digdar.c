@@ -18,6 +18,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <unistd.h>
 #include <getopt.h>
 #include <string.h>
@@ -73,8 +74,10 @@ void usage() {
             "\n"
             "Usage: %s [OPTION]\n"
             "\n"
-            "  --decim  -d    Decimation rate: one of 1 [default], 8, 64, or 1024\n"
-            "  --spp    -s    Samples per pulse. (Up to 16384; default is 4096)\n"
+            "  --decim  -d    Decimation rate: one of 0=1x[default], 1=2x, 2=8x, 3=64x, 4=1024x, 5=8192x, 6x=65536\n"
+            "  --spp    -s    Samples per pulse. (Up to 16384; default is 3000)\n"
+            "  --num_pulses -p Number of pulses to allocate buffer for (default, 1000)\n"
+            "  --chunk_size -c Number of pulses to transfer in each chunk\n"
             "  --version       -v    Print version info.\n"
             "  --help          -h    Print this message.\n"
             "\n";
@@ -83,12 +86,19 @@ void usage() {
 }
 
 
+uint16_t spp = 3000;  // samples to grab per radar pulse
+uint16_t decim = 1; // decimation: 1, 2, or 8
+uint16_t num_pulses = 1000; // pulses to maintain in ring buffer (filled by worker thread)
+uint16_t chunk_size = 1; // pulses to transmit per chunk (main thread)
+uint16_t cur_pulse = 0; // index into pulses buffer
+uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
+
+pulse_metadata *pulse_buffer = 0;
+
 /** Acquire pulses main */
 int main(int argc, char *argv[])
 {
     g_argv0 = argv[0];
-    int decim = 0;
-    int spp = 4096;
 
     if ( argc < MINARGS ) {
         usage();
@@ -100,11 +110,13 @@ int main(int argc, char *argv[])
             /* These options set a flag. */
             {"decim", required_argument,       0, 'd'},
             {"spp",      required_argument,       0, 's'},
+            {"num_pulses",       required_argument,       0, 'p'},
+            {"chunk_size",    required_argument,          0, 'c'},
             {"version",      no_argument,       0, 'v'},
             {"help",         no_argument,       0, 'h'},
             {0, 0, 0, 0}
     };
-    const char *optstring = "d:s:vh";
+    const char *optstring = "c:d:p:s:vh";
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -119,6 +131,14 @@ int main(int argc, char *argv[])
 
         case 's':
           spp = atoi(optarg);
+            break;
+
+        case 'c':
+          chunk_size = atoi(optarg);
+            break;
+
+        case 'p':
+          num_pulses = atoi(optarg);
             break;
 
         case 'v':
@@ -137,14 +157,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (decim == 1)
-      t_params[TIME_RANGE_PARAM] = 0;
-    else if (decim == 2)
-      t_params[TIME_RANGE_PARAM] = 1;
-    else {
-      fprintf(stderr, "incorrect value (%d) for decimation; must be 1 or 8\n", decim);
+    if (decim < 0 || decim > 6) {
+      fprintf(stderr, "incorrect value (%d) for decimation; must be 0...6\n", decim);
       return -1;
     }
+    t_params[DECIM_INDEX_PARAM] = decim;
       
     if (spp > 16384 || spp < 0) {
       fprintf(stderr, "incorrect value (%d) for samples per pulse; must be 0..16384\n", spp);
@@ -169,35 +186,56 @@ int main(int argc, char *argv[])
         fprintf(stderr, "rp_set_params() failed!\n");
         return -1;
     }
-    int num_pulses = 4000;
-    pulse_metadata pm[num_pulses];
-    uint16_t data[spp];
+    
+    psize = sizeof(pulse_metadata) + sizeof(uint16_t) * (spp - 1);
 
-    {
-      for(int i = 0; i < num_pulses; ++i) {
-        if(rp_osc_get_pulse(&pm[i], spp, &data[0], 0))
-          break;
-      }
-    }
-    for (int i = 0; i < num_pulses; ++i) {
-      fprintf(stdout, "%d,%.6f,%d,%d,%.6f,%d,%.6f\n", 
-              i,
-              pm[i].trig_clock / 125.0e6,
-              pm[i].num_trig,
-              pm[i].num_acp,
-              pm[i].acp_clock / 125.0e6,
-              pm[i].num_arp,
-              pm[i].arp_clock / 125.0e6
-              );
-    }
-    puts("Last pulse:\n");
-    for (int i = 0; i < spp; ++i)
-      fprintf(stdout, "%d,%d\n", i, data[i]);
-
-    if(rp_app_exit() < 0) {
-        fprintf(stderr, "rp_app_exit() failed!\n");
+    pulse_buffer = calloc(num_pulses, psize);
+    if (!pulse_buffer) {
+        fprintf(stderr, "couldn't allocate pulse buffer\n");
         return -1;
     }
+    cur_pulse = 0;
 
+    // fill in magic number in pulse headers
+
+    for (int i = 0; i < num_pulses; ++i) {
+      pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + i * psize);
+      pbm->magic_number = 0xf00ff00fabcddcbaLL;
+    }
+
+    //    rp_osc_worker_init();
+
+    // go ahead and start capturing
+
+    rp_osc_worker_change_state(rp_osc_start_state);
+
+    uint16_t my_cur_pulse = 0;
+
+    // NB: should use boost circular_buffer here
+
+    while(1) {
+      uint16_t copy_cur_pulse = cur_pulse;
+      uint16_t nc1, nc2;
+      if (copy_cur_pulse < my_cur_pulse) {
+        nc1 = num_pulses - my_cur_pulse;
+        nc2 = cur_pulse;
+      } else {
+        nc1 = copy_cur_pulse - my_cur_pulse;
+        nc2 = 0;
+      }
+      if (nc1 > 0) {
+        fwrite(((char *) pulse_buffer) + my_cur_pulse * psize, nc1, psize, stdout);
+        my_cur_pulse += nc1;
+        if (my_cur_pulse == num_pulses)
+          my_cur_pulse = 0;
+      }
+      if (nc2 > 0) {
+        fwrite(((char *) pulse_buffer) + my_cur_pulse * psize, nc1, psize, stdout);
+        my_cur_pulse += nc2;
+        if (my_cur_pulse == num_pulses)
+          my_cur_pulse = 0;
+      }
+      sched_yield();
+    }
     return 0;
 }

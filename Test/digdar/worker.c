@@ -101,6 +101,8 @@ int                  *rp_fpga_xcha_signal, *rp_fpga_xchb_signal;
 */
 int rp_osc_worker_init(void)
 {
+  int ret_val;
+
     rp_osc_ctrl               = rp_osc_idle_state;
     rp_osc_params_dirty       = 0;
     rp_osc_params_fpga_update = 0;
@@ -112,6 +114,17 @@ int rp_osc_worker_init(void)
 
     /* Initializing the pointers for the FPGA input signal buffers */
     osc_fpga_get_sig_ptr(&rp_fpga_cha_signal, &rp_fpga_chb_signal, &rp_fpga_xcha_signal, &rp_fpga_xchb_signal);
+
+    /* Creating worker thread */
+    ret_val = 
+        pthread_create(&rp_osc_thread_handler, NULL, rp_osc_worker_thread, NULL);
+    if(ret_val != 0) {
+        osc_fpga_exit();
+
+        fprintf(stderr, "pthread_create() failed: %s\n", 
+                strerror(errno));
+        return -1;
+    }
 
     return 0;
 }
@@ -127,89 +140,145 @@ int rp_osc_worker_init(void)
 */
 int rp_osc_worker_exit(void)
 {
+  int ret_val;
+
+    rp_osc_worker_change_state(rp_osc_quit_state);
+    ret_val = pthread_join(rp_osc_thread_handler, NULL);
+    if(ret_val != 0) {
+        fprintf(stderr, "pthread_join() failed: %s\n", 
+                strerror(errno));
+    }
+
     osc_fpga_exit();
     return 0;
 }
 
-
-/** @brief Returns a pulse of data
- * 
- * @param [out] pm Pointer to pulse_metadata structure. If null, no metdata are written.
+/** @brief Changes the worker state
  *
- * @param [in] ns Number of samples to grab for a pulse; 0...16384
+ * This function is used to change the worker thread state. When new state is
+ * requested, it is not effective immediately. It is changed only when thread
+ * loop checks and accepts it (for example - if new state is requested during
+ * signal processing - the worker thread loop will detect change in the state
+ * only after it finishes the processing.
  *
- * @param [out] data Pointer to location to store samples; must be allocated to hold at least ns samples.
- * If null, no samples are written.
+ * @param [in] new_state New requested state
  *
- * @param [out] pm Pointer to pulse_metadata structure
- *
- * @param [in] timeout maximum wait time, in microseconds.  If zero, wait forever.
- *
- * @retval 0 okay.
- *         -1 reached timeout without a pulse
-*/
-
-int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t timeout)
+ * @retval -1 Failure
+ * @retval 0 Success
+ **/
+int rp_osc_worker_change_state(rp_osc_worker_state_t new_state)
 {
-  static int initial_arm = 0;
-
-  if (ns > 16384)
-    ns = 16384;
-
-  /* set number of samples to collect after triggering */
-  osc_fpga_set_trigger_delay(ns);
-
-  /* Start the writing machine */
-  if (! initial_arm) {
-    osc_fpga_arm_trigger();
-    /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
-    osc_fpga_set_trigger(10);
-    initial_arm = 1;
-  }
-        
-        
-  /* Sleep for a while, waiting for sample; imposes maximum PRF of
-     10 kHz */
-
-  uint32_t waited = 0;
-  for(;;) {
-    const uint32_t single_wait = 10;  // wait 10 us at a time
-    if(osc_fpga_triggered())
-      break;
-    usleep(single_wait);
-    waited += single_wait;
-    if (timeout > 0 && waited >= timeout)
-      return -1;
-  }
-
-  if (pm) {
-    pm->trig_clock = g_digdar_fpga_reg_mem->trig_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->trig_clock_high) << 32);
-    pm->num_trig = g_digdar_fpga_reg_mem->trig_count;
-    pm->num_acp = g_digdar_fpga_reg_mem->acp_count;
-    pm->acp_clock = g_digdar_fpga_reg_mem->acp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->acp_clock_high) << 32);
-    pm->num_arp = g_digdar_fpga_reg_mem->arp_count;
-    pm->arp_clock = g_digdar_fpga_reg_mem->arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->arp_clock_high) << 32);
-  }
-
-  int32_t tr_ptr;
-  osc_fpga_get_wr_ptr(0, &tr_ptr);
-
-  // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
-  // for this one.
-
-  osc_fpga_arm_trigger();
-  /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
-  osc_fpga_set_trigger(10);
-
-  if (data) {
-    int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
-    int32_t *max_data = & rp_fpga_cha_signal[16384];
-    for (uint16_t i = 0; i < ns; ++i) {
-      data[i] = *src_data++;
-      if (src_data == max_data)
-        src_data = & rp_fpga_cha_signal[0];
-    }
-  }
-  return 0;
+    if(new_state >= rp_osc_nonexisting_state)
+        return -1;
+    pthread_mutex_lock(&rp_osc_ctrl_mutex);
+    rp_osc_ctrl = new_state;
+    pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+    return 0;
 }
+
+/** @brief Updates the worker copy of the parameters 
+ *
+ * This function is used to update the parameters in worker. These parameters are
+ * not effective immediately. They will be used by worker thread loop after 
+ * current operation is finished.
+ * 
+ * @param [in] params New parameters
+ * @param [in] fpga_update Flag is FPGA needs to be updated.
+ *
+ * @retval 0 Always returns 0
+ **/
+int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update)
+{
+    pthread_mutex_lock(&rp_osc_ctrl_mutex);
+    memcpy(&rp_osc_params, params, sizeof(rp_osc_params_t)*PARAMS_NUM);
+    rp_osc_params_dirty       = 1;
+    rp_osc_params_fpga_update = fpga_update;
+    pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+    return 0;
+}
+
+
+void *rp_osc_worker_thread(void *args)
+{
+    rp_osc_worker_state_t state = rp_osc_idle_state;
+
+    pthread_mutex_lock(&rp_osc_ctrl_mutex);
+    state = rp_osc_ctrl;
+    pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+
+    /* set number of samples to collect after triggering */
+    osc_fpga_set_trigger_delay(spp);
+
+    static int did_first_arm = 0;
+
+    /* Continuous thread loop (exited only with 'quit' state) */
+    while(1) {
+        pthread_mutex_lock(&rp_osc_ctrl_mutex);
+        state = rp_osc_ctrl;
+        pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+
+        /* request to stop worker thread, we will shut down */
+
+        if(state == rp_osc_quit_state) {
+            return 0;
+        }
+
+        if(state == rp_osc_idle_state) {
+            usleep(10000);
+            continue;
+        }
+
+        if(state != rp_osc_start_state) {
+          usleep(1000);
+          continue;
+        }
+
+        if (! did_first_arm) {
+          osc_fpga_arm_trigger();
+          osc_fpga_set_trigger(10);
+          did_first_arm = 1;
+        }
+
+        if( ! osc_fpga_triggered()) {
+          usleep(10);
+          continue;
+        }
+
+        // get trigger write pointer (i.e. where do data start?)
+        int32_t tr_ptr;
+        int32_t wr_ptr;
+        osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
+
+        pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
+        pbm->trig_clock = g_digdar_fpga_reg_mem->saved_trig_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_trig_clock_high) << 32);
+        pbm->num_trig = g_digdar_fpga_reg_mem->saved_trig_count;
+        pbm->num_acp = g_digdar_fpga_reg_mem->saved_acp_count;
+        pbm->acp_clock = g_digdar_fpga_reg_mem->saved_acp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_acp_clock_high) << 32);
+        pbm->num_arp = g_digdar_fpga_reg_mem->saved_arp_count;
+        pbm->arp_clock = g_digdar_fpga_reg_mem->saved_arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_arp_clock_high) << 32);
+
+        // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
+        // for this one.
+
+        osc_fpga_arm_trigger();
+        
+        /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
+        osc_fpga_set_trigger(10);
+
+        uint16_t * data = & pbm->data[0];
+        int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
+        int32_t *max_data = & rp_fpga_cha_signal[16384];
+        for (uint16_t i = 0; i < spp; ++i) {
+          data[i] = *src_data++;
+          if (src_data == max_data)
+            src_data = & rp_fpga_cha_signal[0];
+        }
+
+        ++ cur_pulse;
+        if (cur_pulse == num_pulses)
+          cur_pulse = 0;
+    }
+    return 0;
+}
+
 

@@ -141,7 +141,7 @@ typedef struct osc_fpga_reg_mem_s {
 
     /** @brief  Data decimation
      * bits [16: 0] - decimation factor, legal values:
-     *   1, 8, 64, 1024, 8192 65536
+     *   1, 2, 8, 64, 1024, 8192 65536
      *   If other values are written data is undefined 
      * bits [31:17] - reserved
      */
@@ -223,12 +223,14 @@ typedef struct osc_fpga_reg_mem_s {
     uint32_t chb_filt_pp;            
 
     /** @brief Flag - only record samples after triggered
-     * bits [0] - if 1, only record samples after trigger detected
+     * bit [0] - if 1, only record samples after trigger detected
      *            this serves to protect a digitized pulse, so that
      *            we can be reading it from BRAM into DRAM while the FPGA
      *            waits for and digitizes another pulse. (Provided the number
      *            of samples to be digitized is <= 1/2 the buffer size of 16 k samples)
-     * bits [31:1] - reserved
+     * bit [1] - if 1, ADC A negates values and returns in 2s complement; otherwise, 
+     *           values are returned as-is.
+     * bits [31:2] - reserved
      */
     uint32_t post_trig_only;
   
@@ -542,7 +544,7 @@ int   osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal
 int   osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
 
 int   osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
-int   osc_fpga_cnv_time_range_to_dec(int time_range);
+int   osc_fpga_cnv_decim_index_to_dec(int decim_index);
 int   osc_fpga_cnv_time_to_smpls(float time, int dec_factor);
 /* int   osc_fpga_cnv_v_to_cnt(float voltage, float max_adc_v, */
 /*                             int calib_dc_off, float user_dc_off); */
