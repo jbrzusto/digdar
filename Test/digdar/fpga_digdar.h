@@ -520,31 +520,18 @@ typedef struct {
 int   osc_fpga_init(void);
 int   osc_fpga_exit(void);
 int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
-                           float trig_delay, float trig_level, int time_range,
+                           float trig_delay, float trig_level, int decim_factor,
                            int equal, int shaping, int gain1, int gain2);
-/* int   osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, */
-/*                              float trig_delay, float trig_level, int time_range, */
-/*                              float ch1_adc_max_v, float ch2_adc_max_v, */
-/*                              int ch1_calib_dc_off, float ch1_user_dc_off, */
-/*                              int ch2_calib_dc_off, float ch2_user_dc_off, */
-/*                              int ch1_probe_att, int ch2_probe_att, */
-/* 			      int ch1_gain, int ch2_gain, */
-/*                              int enable_avg_at_dec, */
-/*                              float trig_excite, float trig_relax, float digdar_trig_delay, float trig_latency, */
-/*                              float acp_excite, float acp_relax, float acp_latency, */
-/*                              float arp_excite, float arp_relax, float arp_latency, */
-/*                              float acps_per_arp */
-/* ); */
 int   osc_fpga_reset(void);
 int   osc_fpga_arm_trigger(void);
 int   osc_fpga_set_trigger(uint32_t trig_source);
 int   osc_fpga_set_trigger_delay(uint32_t trig_delay);
+int   osc_fpga_set_decim(uint32_t decim_factor);
 int   osc_fpga_triggered(void);
 int   osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal, int **xchb_signal);
 int   osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
 
 int   osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
-int   osc_fpga_cnv_decim_index_to_dec(int decim_index);
 int   osc_fpga_cnv_time_to_smpls(float time, int dec_factor);
 /* int   osc_fpga_cnv_v_to_cnt(float voltage, float max_adc_v, */
 /*                             int calib_dc_off, float user_dc_off); */

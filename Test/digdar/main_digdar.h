@@ -62,8 +62,8 @@ typedef struct rp_osc_params_s {
 #define TRIG_LEVEL_PARAM 6
 /** Single acquisition requested */
 #define SINGLE_BUT_PARAM 7
-/** Decimation index */
-#define DECIM_INDEX_PARAM 8
+/** Decimation factor */
+#define DECIM_FACTOR_PARAM 8
 /** Time unit (read-only) */
 #define TIME_UNIT_PARAM  9
 /** Equalization filter */

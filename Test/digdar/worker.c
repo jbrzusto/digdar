@@ -198,6 +198,16 @@ int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update)
 }
 
 
+static uint16_t cur_pulse = 0; // index into pulses buffer
+
+uint16_t rp_osc_get_current_pulse_index() {
+  uint16_t rv;
+  pthread_mutex_lock(&rp_osc_ctrl_mutex);
+  rv = cur_pulse;
+  pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+  return(rv);
+};
+
 void *rp_osc_worker_thread(void *args)
 {
     rp_osc_worker_state_t state = rp_osc_idle_state;
@@ -209,13 +219,15 @@ void *rp_osc_worker_thread(void *args)
     /* set number of samples to collect after triggering */
     osc_fpga_set_trigger_delay(spp);
 
+    osc_fpga_set_decim(decim);
+
     static int did_first_arm = 0;
+
+    int32_t *max_data = & rp_fpga_cha_signal[16384];
 
     /* Continuous thread loop (exited only with 'quit' state) */
     while(1) {
-        pthread_mutex_lock(&rp_osc_ctrl_mutex);
         state = rp_osc_ctrl;
-        pthread_mutex_unlock(&rp_osc_ctrl_mutex);
 
         /* request to stop worker thread, we will shut down */
 
@@ -241,6 +253,7 @@ void *rp_osc_worker_thread(void *args)
 
         if( ! osc_fpga_triggered()) {
           usleep(10);
+          sched_yield();
           continue;
         }
 
@@ -267,16 +280,31 @@ void *rp_osc_worker_thread(void *args)
 
         uint16_t * data = & pbm->data[0];
         int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
-        int32_t *max_data = & rp_fpga_cha_signal[16384];
-        for (uint16_t i = 0; i < spp; ++i) {
-          data[i] = *src_data++;
-          if (src_data == max_data)
-            src_data = & rp_fpga_cha_signal[0];
+        uint16_t n1 = max_data - src_data;
+        uint16_t n2;
+        if (n1 >= spp) {
+          n1 = spp;
+          n2 = 0;
+        } else {
+          n2 = spp - n1;
+        }
+        uint16_t i;
+        for (i = 0; i < n1; ++i) {
+          data[i] = src_data[i];
+        }
+        if (n2) {
+          src_data = & rp_fpga_cha_signal[0];
+          data = &data[i];
+          for (i = 0; i < n2; ++i) {
+            data[i] = src_data[i];
+          }
         }
 
-        ++ cur_pulse;
+        pthread_mutex_lock(&rp_osc_ctrl_mutex);
+        ++cur_pulse;
         if (cur_pulse == num_pulses)
           cur_pulse = 0;
+        pthread_mutex_unlock(&rp_osc_ctrl_mutex);
     }
     return 0;
 }

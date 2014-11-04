@@ -270,7 +270,7 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  * @param [in] trig_edge Trigger edge, as defined in rp_main_params.
  * @param [in] trig_delay Trigger delay in [s].
  * @param [in] trig_level Trigger level in [V].
- * @param [in] decim_index Decimation index, as defined in rp_main_params.
+ * @param [in] decim_factor Decimation factor.
  * @param [in] equal    Enable(1)/disable(0) equalization filter.
  * @param [in] shaping  Enable(1)/disable(0) shaping filter.
  * @param [in] gain1    Gain setting for Channel1 (0 = LV, 1 = HV).
@@ -283,12 +283,11 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  * @see rp_main_params
  */
 int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
-                           float trig_delay, float trig_level, int decim_index,
+                           float trig_delay, float trig_level, int decim_factor,
                            int equal, int shaping, int gain1, int gain2)
 {
     int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source, 
                                                     trig_edge);
-    int fpga_dec_factor = osc_fpga_cnv_decim_index_to_dec(decim_index);
     int fpga_delay;
     float after_trigger; /* how much after trigger FPGA should write */
     int fpga_trig_thr = osc_fpga_cnv_v_to_cnt(trig_level);
@@ -299,7 +298,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
     get_equ_shape_filter(&cha_filt, equal, shaping, gain1);
     get_equ_shape_filter(&chb_filt, equal, shaping, gain2);
     
-    if((fpga_trig_source < 0) || (fpga_dec_factor < 0)) {
+    if((fpga_trig_source < 0) || (decim_factor < 0)) {
         fprintf(stderr, "osc_fpga_update_params() failed\n");
         return -1;
     }
@@ -308,16 +307,16 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
      * readout historic (pre-trigger) values */
     
     if (trig_imm)
-      after_trigger=OSC_FPGA_SIG_LEN* c_osc_fpga_smpl_period * fpga_dec_factor;
+      after_trigger=OSC_FPGA_SIG_LEN* c_osc_fpga_smpl_period * decim_factor;
     else
     after_trigger = 
-        ((OSC_FPGA_SIG_LEN-7) * c_osc_fpga_smpl_period * fpga_dec_factor) +
+        ((OSC_FPGA_SIG_LEN-7) * c_osc_fpga_smpl_period * decim_factor) +
         trig_delay;
 
     if(after_trigger < 0)
         after_trigger = 0;
 
-    fpga_delay = osc_fpga_cnv_time_to_smpls(after_trigger, fpga_dec_factor);
+    fpga_delay = osc_fpga_cnv_time_to_smpls(after_trigger, decim_factor);
 
     /* Trig source is written after ARM */
     /*    g_osc_fpga_reg_mem->trig_source   = fpga_trig_source;*/
@@ -326,7 +325,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
     else
         g_osc_fpga_reg_mem->chb_thr   = fpga_trig_thr;
 
-    g_osc_fpga_reg_mem->data_dec      = fpga_dec_factor;
+    g_osc_fpga_reg_mem->data_dec      = decim_factor;
     g_osc_fpga_reg_mem->trigger_delay = (uint32_t)fpga_delay;
 
     /* Update equalization filter with desired coefficients. */
@@ -378,6 +377,20 @@ int osc_fpga_arm_trigger(void)
 int osc_fpga_set_trigger(uint32_t trig_source)
 {
     g_osc_fpga_reg_mem->trig_source = trig_source;
+    return 0;
+}
+
+/** @brief Sets the decimation rate in the OSC FPGA register.
+ *
+ * Sets the decimation rate in the oscilloscope FPGA register. 
+ *
+ * @param [in] decim_factor decimation factor, which must be
+ * one of the valid values for the FPGA build:
+ * 1, 2, 8, 64, 1024, 8192, 65536
+ */
+int osc_fpga_set_decim(uint32_t decim_factor)
+{
+    g_osc_fpga_reg_mem->data_dec = decim_factor;
     return 0;
 }
 
@@ -496,49 +509,6 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
     return fpga_trig_source;
 }
 
-/** @brief Converts decimation index to decimation value.
- *
- * This function converts the decimation mode index to an actual decimation factor.
- *
- * @param [in] decim_index Decimation factor, integer between 0 and 6, as defined by
- *             rp_main_params.
- * 
- * @retval -1 Error
- *
- * @retval otherwise Decimation factor.
-*/
-int osc_fpga_cnv_decim_index_to_dec(int decim_index)
-{
-    /* Input: 0, 1, 2, 3, 4, 5, 6 translates to:
-     * Output: 1x, 2x, 8x, 64x, 1kx, 8kx, 65kx */
-    switch(decim_index) {
-    case 0:
-        return 1;
-        break;
-    case 1:
-        return 2;
-        break;
-    case 2:
-        return 8;
-        break;
-    case 3:
-        return 64;
-        break;
-    case 4:
-        return 1024;
-        break;
-    case 5:
-        return 8*1024;
-        break;
-    case 6:
-        return 64*1024;
-        break;
-    default:
-        return -1;
-    }
-
-    return -1;
-}
 
 /** @brief Converts time to number of samples.
  *
