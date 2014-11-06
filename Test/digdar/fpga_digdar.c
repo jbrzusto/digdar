@@ -362,7 +362,7 @@ int osc_fpga_reset(void)
  */
 int osc_fpga_arm_trigger(void)
 {
-  g_osc_fpga_reg_mem->post_trig_only = 3;  // 1: only buffer samples *after* being triggered; 2: negate range of sample values
+  g_osc_fpga_reg_mem->post_trig_only = 7;  // 1: only buffer samples *after* being triggered; 2: negate range of sample values; 4: double-width reads
   g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
     return 0;
 }

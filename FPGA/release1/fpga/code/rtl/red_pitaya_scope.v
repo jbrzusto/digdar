@@ -93,6 +93,8 @@ reg             adc_arm_do   ;
 reg             adc_rst_do   ;
 reg [32-1:0]    post_trig_only;
 reg [ 32-1:0 ] bogus_reg   ;
+
+reg [14-1:0] counter; // counter for counting mode
    
 
 
@@ -132,7 +134,7 @@ assign adc_b_filt_in = adc_b_i ;
 // );
 
    // no input filtering
-assign adc_a_filt_out = adc_a_filt_in;
+assign adc_a_filt_out = counting_mode ? counter : adc_a_filt_in;
    
 red_pitaya_dfilt1 i_dfilt1_chb
 (
@@ -171,8 +173,11 @@ always @(posedge adc_clk_i) begin
       adc_b_sum   <= 32'h0 ;
       adc_dec_cnt <= 17'h0 ;
       adc_dv      <=  1'b0 ;
+      
    end
    else begin
+      counter <= 14'b1 + counter;
+      
       if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
          adc_dec_cnt <= 17'h1                   ;
          adc_a_sum   <= $signed(adc_a_filt_out) ;
@@ -214,9 +219,11 @@ end
 localparam RSZ = 14 ;  // RAM size 2^RSZ
 
 
-reg   [14-1: 0] adc_a_buf [0:(1<<RSZ)-1] ;
+reg   [28-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
+reg [28-1: 0] adc_a_tmp ; // temporary register for accumulating two 14-bit samples before saving to buffer
+   
 reg   [14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
-reg   [14-1: 0] adc_a_rd       ;
+reg   [28-1: 0] adc_a_rd       ;
 reg   [14-1: 0] adc_b_rd       ;
 reg   [12-1: 0] xadc_a_buf [0:(1<<RSZ)-1] ;
 reg   [12-1: 0] xadc_b_buf [0:(1<<RSZ)-1] ;
@@ -225,6 +232,8 @@ reg   [12-1: 0] xadc_b_rd       ;
 reg   [ RSZ-1: 0] adc_wp        ;
 reg   [ RSZ-1: 0] adc_raddr     ;
 reg   [ RSZ-1: 0] adc_a_raddr   ;
+reg               adc_a_word_sel;
+   
 reg   [ RSZ-1: 0] adc_b_raddr   ;
 reg   [ RSZ-1: 0] xadc_a_raddr  ;
 reg   [ RSZ-1: 0] xadc_b_raddr  ;
@@ -242,6 +251,10 @@ reg               adc_dly_do    ;
 assign adc_ready_o = adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
 
 assign negate = post_trig_only[1]; // extra bit: 1 means reverse range of ADC values.
+
+assign read32 = post_trig_only[2]; // 1 means reads from buffers are 32 bits, not 16, with specified address in lower 16 bits, next address in upper 16 bits
+
+assign counting_mode = post_trig_only[3]; // 1 means we use a counter instead of the real adc values
     
 // Write
 always @(posedge adc_clk_i) begin
@@ -298,7 +311,11 @@ end
 
 always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
-      adc_a_buf[adc_wp] <= negate ? {adc_a_dat[14-1], ~adc_a_dat[13-1:0]} : adc_a_dat ;
+      // Note: the adc_a buffer is 28 bits wide, so we only write into it on every 2nd sample
+      adc_a_tmp <= {adc_a_tmp[14-1:0], negate ? {adc_a_dat[14-1], ~adc_a_dat[13-1:0]} : adc_a_dat} ;
+      if (adc_wp[0]) begin
+         adc_a_buf[adc_wp[RSZ-1:1]] <= adc_a_tmp;
+      end
       adc_b_buf[adc_wp] <= adc_b_dat ;
       xadc_a_buf[adc_wp] <= xadc_a ;
       xadc_b_buf[adc_wp] <= xadc_b ;
@@ -315,15 +332,16 @@ end
 assign adc_rd_dv = adc_rval[3];
 
 always @(posedge adc_clk_i) begin
-   adc_raddr   <= addr[RSZ+1:2] ; // address synchronous to clock
-   adc_a_raddr <= adc_raddr     ; // double register 
-   adc_b_raddr <= adc_raddr     ; // otherwise memory corruption at reading
-   xadc_a_raddr <= adc_a_raddr     ; // double register 
-   xadc_b_raddr <= adc_b_raddr     ; // otherwise memory corruption at reading
-   adc_a_rd    <= adc_a_buf[adc_a_raddr] ;
-   adc_b_rd    <= adc_b_buf[adc_b_raddr] ;
-   xadc_a_rd    <= xadc_a_buf[xadc_a_raddr] ;
-   xadc_b_rd    <= xadc_b_buf[xadc_b_raddr] ;
+   adc_raddr      <= addr[RSZ+1:2] ; // address synchronous to clock
+   adc_a_raddr    <= adc_raddr     ; // double register 
+   adc_b_raddr    <= adc_raddr     ; // otherwise memory corruption at reading
+   xadc_a_raddr   <= adc_a_raddr     ; // double register 
+   xadc_b_raddr   <= adc_b_raddr     ; // otherwise memory corruption at reading
+   adc_a_rd       <= adc_a_buf[adc_a_raddr[RSZ-1:1]] ;
+   adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 14 bits of 28 bit value in adc_a_rd; else use lower 14 bits   
+   adc_b_rd       <= adc_b_buf[adc_b_raddr] ;
+   xadc_a_rd      <= xadc_a_buf[xadc_a_raddr] ;
+   xadc_b_rd      <= xadc_b_buf[xadc_b_raddr] ;
 end
 
 
@@ -570,8 +588,8 @@ always @(posedge adc_clk_i) begin
       set_b_filt_bb <=  25'h0      ;
       set_b_filt_kk <=  25'hFFFFFF ;
       set_b_filt_pp <=  25'h0      ;
-      post_trig_only <= 32'hfeadbee0;
-      
+      post_trig_only <= 32'h0      ;
+      counter       <=  14'h0      ;
    end
    else begin
       if (wen) begin
@@ -629,7 +647,7 @@ always @(*) begin
      20'h0004C : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_pp}      ; end
      20'h00050 : begin ack <= 1'b1;          rdata <= {post_trig_only}      ; end
 
-     20'h1???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_a_rd}             ; end
+     20'h1???? : begin ack <= adc_rd_dv;     rdata <= read32 ? {2'h0, adc_a_rd[28-1:14], 2'h0, adc_a_rd[14-1:0]} :  {16'h0, 2'h0, adc_a_word_sel ? adc_a_rd[28-1:14] : adc_a_rd[14-1:0]}             ; end
      20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
 
      20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}            ; end

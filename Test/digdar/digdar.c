@@ -66,21 +66,28 @@ float t_params[PARAMS_NUM] = { 0, 1e6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 /** Print usage information */
 void usage() {
 
-    const char *format =
-            "\n"
-            "Usage: %s [OPTION]\n"
-            "\n"
-            "  --decim  -d    Decimation rate: one of 1, 2, 8, 64, 1024, 8192, or 65536"
-            "  --spp    -s    Samples per pulse. (Up to 16384; default is 3000)\n"
-            "  --num_pulses -p Number of pulses to allocate buffer for (default, 1000)\n"
-            "  --chunk_size -c Number of pulses to transfer in each chunk\n"
-            "  --version       -v    Print version info.\n"
-            "  --help          -h    Print this message.\n"
-            "\n";
+  const char *format =
+    "\n"
+    "Usage: %s [OPTION]\n"
+    "\n"
+    "  --decim  -d DECIM   Decimation rate: one of 1, 2, 8, 64, 1024, 8192, or 65536\n"
+    "  --samples   -n SAMPLES   Samples per pulse. (Up to 16384; default is 3000)\n"
+    "  --pulses -p PULSES Number of pulses to allocate buffer for (default, 1000)\n"
+    "  --remove -r START:END  Remove sector.  START and END are portions of the circle in [0, 1]\n"
+    "                         where 0 is the start of the ARP pulse, and 1 is the start of the next ARP\n"
+    "                         pulse.  Pulses within the sector from START to END are remoted and not output.\n"
+    "                         If START > END, the removed sector consists of [END, 1] U [0, START].\n"
+    "                         Multiple --remove options may be given.\n"
+    "  --chunk_size -c Number of pulses to transfer in each chunk\n"
+    "  --version       -v    Print version info.\n"
+    "  --help          -h    Print this message.\n"
+    "\n";
 
     fprintf( stderr, format, g_argv0);
 }
 
+sector removals[MAX_REMOVALS];
+uint16_t num_removals = 0;
 
 uint16_t spp = 3000;  // samples to grab per radar pulse
 uint32_t decim = 1; // decimation: 1, 2, 8, etc.
@@ -104,14 +111,15 @@ int main(int argc, char *argv[])
     static struct option long_options[] = {
             /* These options set a flag. */
             {"decim", required_argument,       0, 'd'},
-            {"n",      required_argument,       0, 'n'},
+            {"samples",      required_argument,       0, 'n'},
             {"pulses",       required_argument,       0, 'p'},
             {"chunk_size",    required_argument,          0, 'c'},
+            {"remove",    required_argument,          0, 'r'},
             {"version",      no_argument,       0, 'v'},
             {"help",         no_argument,       0, 'h'},
             {0, 0, 0, 0}
     };
-    const char *optstring = "c:d:p:n:vh";
+    const char *optstring = "c:d:hn:p:r:v";
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -120,29 +128,46 @@ int main(int argc, char *argv[])
     while ( (ch = getopt_long( argc, argv, optstring, long_options, &option_index )) != -1 ) {
         switch ( ch ) {
 
+        case 'c':
+          chunk_size = atoi(optarg);
+            break;
+
         case 'd':
           decim = atoi(optarg);
+            break;
+
+        case 'h':
+            usage();
+            exit( EXIT_SUCCESS );
             break;
 
         case 'n':
           spp = atoi(optarg);
             break;
 
-        case 'c':
-          chunk_size = atoi(optarg);
-            break;
-
         case 'p':
           num_pulses = atoi(optarg);
             break;
 
+        case 'r':
+          {
+            if (num_removals == MAX_REMOVALS) {
+              fprintf(stderr, "Too many removals specified; max is %d\n", MAX_REMOVALS);
+              exit( EXIT_FAILURE );
+            }
+            char *split = strchr(optarg, ':');
+            if (! split) {
+              usage();
+              exit (EXIT_FAILURE );
+            }
+            *split = '\0';
+            ++num_removals;
+            removals[num_removals].begin = atoi(optarg);
+            removals[num_removals].end = atoi(split + 1);
+          };
+          break;
         case 'v':
             fprintf(stdout, "%s version %s-%s\n", g_argv0, VERSION_STR, REVISION_STR);
-            exit( EXIT_SUCCESS );
-            break;
-
-        case 'h':
-            usage();
             exit( EXIT_SUCCESS );
             break;
 

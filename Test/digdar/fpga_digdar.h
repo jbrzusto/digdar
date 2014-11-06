@@ -82,6 +82,8 @@
 #define OFFSET_SAVED_ARP_PREV_CLOCK_LOW   0x0009C // (saved) clock at previous ARP (low 32 bits)
 #define OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  0x000A0 // (saved) clock at previous ARP (high 32 bits)
 #define OFFSET_SAVED_ACP_PER_ARP          0x000A4 // (saved) count of ACP pulses between two most recent ARP pulses                                  
+#define OFFSET_ACP_AT_ARP                 0x000B8 // most recent ACP count at ARP pulse
+#define OFFSET_SAVED_ACP_AT_ARP           0x000BC // (saved) most recent ACP count at ARP pulse
 
 /** Hysteresis register default setting */
 
@@ -495,7 +497,34 @@ typedef struct digdar_fpga_reg_mem_s {
      */
   uint32_t saved_acp_per_arp;
 
-  // other scratch / debugging registers which we don't bother mapping for now
+    /** @brief  clocks: 64-bit count of ADC clock ticks since reset
+     */
+  uint64_t clocks;
+  
+  /** @brief  most recent slow ADC value from ACP
+     */
+  
+  uint32_t acp_raw; 
+  /** @brief  most recent slow ADC value from ARP
+     */
+
+  uint32_t arp_raw; 
+
+    /** @brief  acp_at_arp:  value of acp count at most recent arp pulse
+     */
+  uint32_t acp_at_arp;
+
+    /** @brief  saved_acp_at_arp:  value at start of most recently captured pulse
+     */
+  uint32_t saved_acp_at_arp;
+
+    /** @brief  trig_at_arp:  value of trig count at most recent arp pulse
+     */
+  uint32_t trig_at_arp;
+
+    /** @brief  saved_trig_at_arp:  value at start of most recently captured pulse
+     */
+  uint32_t saved_trig_at_arp;
 
 } digdar_fpga_reg_mem_t;
 

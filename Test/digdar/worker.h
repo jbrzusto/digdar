@@ -65,6 +65,15 @@ extern uint16_t num_pulses; // pulses to maintain in ring buffer (filled by work
 extern uint16_t chunk_size; // pulses to transmit per chunk (main thread)
 extern uint32_t psize; // size of each pulse's storage
 
+typedef struct {
+  float begin;
+  float end;
+} sector;
+
+#define MAX_REMOVALS 32
+extern sector removals[MAX_REMOVALS];
+extern uint16_t num_removals;
+
 extern pulse_metadata *pulse_buffer;
 
 #endif /* __WORKER_H*/

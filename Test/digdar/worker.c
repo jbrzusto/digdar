@@ -263,12 +263,28 @@ void *rp_osc_worker_thread(void *args)
         osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
 
         pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
-        pbm->trig_clock = g_digdar_fpga_reg_mem->saved_trig_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_trig_clock_high) << 32);
+        uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
+        pbm->arp_clock = arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_arp_clock_high) << 32);
+        // trig clock is relative to arp clock
+        uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
+        pbm->trig_clock = trig_clock_low - arp_clock_low;
+
+        // acp clock is in [0..1] representing best estimate of the portion of sweep completed
+        // since the most recent arp
+        // That is, the number of ACPs / the number of ACPs per sweep, plus a bit of extra
+        // based on how long since the last ACP compared to the most recent ACP period
+
+        uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
+
+        pbm->acp_clock = g_digdar_fpga_reg_mem->saved_acp_count - g_digdar_fpga_reg_mem->saved_acp_at_arp; // # of whole ACPs since ARP
+        uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
+        if (acp_period > 0)
+          pbm->acp_clock += (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
+
+        uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
+        pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
+
         pbm->num_trig = g_digdar_fpga_reg_mem->saved_trig_count;
-        pbm->num_acp = g_digdar_fpga_reg_mem->saved_acp_count;
-        pbm->acp_clock = g_digdar_fpga_reg_mem->saved_acp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_acp_clock_high) << 32);
-        pbm->num_arp = g_digdar_fpga_reg_mem->saved_arp_count;
-        pbm->arp_clock = g_digdar_fpga_reg_mem->saved_arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_arp_clock_high) << 32);
 
         // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
         // for this one.
@@ -277,6 +293,21 @@ void *rp_osc_worker_thread(void *args)
         
         /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
         osc_fpga_set_trigger(10);
+
+        /* check whether this pulse is in a removal segment */
+        if (num_removals) {
+          int keep = 1;
+          float rr = pbm->acp_clock;
+          for (int i = 0; keep && i < num_removals; ++i) {
+            if (removals[i].begin <= removals[i].end) {
+              if (rr >= removals[i].begin && rr <= removals[i].end)
+                keep = 0;
+            } else if (rr >= removals[i].begin || rr <= removals[i].end)
+              keep = 0;
+          }
+          if (! keep)
+            continue;
+        }
 
         uint16_t * data = & pbm->data[0];
         int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
@@ -288,15 +319,28 @@ void *rp_osc_worker_thread(void *args)
         } else {
           n2 = spp - n1;
         }
-        uint16_t i;
-        for (i = 0; i < n1; ++i) {
-          data[i] = src_data[i];
+        uint16_t i=0;
+        // when tr_ptr is odd, we need to start with the higher-order word
+        uint32_t tmp;
+        if (tr_ptr & 1) {
+          tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
+          data[0] = tmp >> 16;
+          ++i;
+        }
+        for (/**/ ; i < n1; ++i) {
+          tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
+          data[i] = tmp & 0xffff;
+          if (++i < n1)
+            data[i] = tmp >> 16;
         }
         if (n2) {
           src_data = & rp_fpga_cha_signal[0];
           data = &data[i];
           for (i = 0; i < n2; ++i) {
-            data[i] = src_data[i];
+            tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
+            data[i] = tmp & 0xffff;
+            if (++i < n2)
+              data[i] = tmp >> 16;
           }
         }
 

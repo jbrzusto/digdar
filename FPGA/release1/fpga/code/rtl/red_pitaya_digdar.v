@@ -70,7 +70,7 @@
 `define OFFSET_SAVED_ARP_PREV_CLOCK_LOW   20'h0009C // (saved) clock at previous ARP (low 32 bits)
 `define OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  20'h000A0 // (saved) clock at previous ARP (high 32 bits)
 `define OFFSET_SAVED_ACP_PER_ARP          20'h000A4 // (saved) count of ACP pulses between two most recent ARP pulses                                  
-                                                   
+
 // utility / debugging registers                   
                                                    
 `define OFFSET_CLOCKS_LOW                 20'h000A8 // clock counter since reset (low 32 bits)
@@ -78,7 +78,11 @@
                                                    
 `define OFFSET_ACP_RAW                    20'h000B0 // most recent slow ADC value from ACP
 `define OFFSET_ARP_RAW                    20'h000B4 // most recent slow ADC value from ARP
-                                                   
+
+`define OFFSET_ACP_AT_ARP                 20'h000B8 // most recent ACP count at ARP pulse
+`define OFFSET_SAVED_ACP_AT_ARP           20'h000BC // (saved) most recent ACP count at ARP pulse
+`define OFFSET_TRIG_AT_ARP                20'h000C0 // most recent trig count at ARP pulse
+`define OFFSET_SAVED_TRIG_AT_ARP          20'h000C4 // (saved) most recent trig count at ARP pulse
 
 module red_pitaya_digdar
 (
@@ -126,7 +130,8 @@ reg  [64-1: 0] arp_clock          ;
 reg  [64-1: 0] arp_prev_clock     ;
 reg  [64-1: 0] clock_counter      ;
 reg  [32-1: 0] acp_per_arp        ;
-reg  [32-1: 0] prev_acp_count     ;
+reg  [32-1: 0] acp_at_arp         ;
+reg  [32-1: 0] trig_at_arp        ;
 reg  [14-1: 0] trig_thresh_excite  ;
 reg  [14-1: 0] trig_thresh_relax   ;
 reg  [32-1: 0] trig_delay          ;
@@ -145,6 +150,8 @@ reg [64-1: 0] saved_arp_clock           ;
 reg [64-1: 0] saved_arp_prev_clock      ;
 reg [64-1: 0] saved_clock_counter       ;
 reg [32-1: 0] saved_acp_per_arp         ;                                
+reg [32-1: 0] saved_acp_at_arp          ;
+reg [32-1: 0] saved_trig_at_arp         ;
 reg [32-1: 0] saved_trig_count          ;
 reg [64-1: 0] saved_trig_clock          ;
 reg [64-1: 0] saved_trig_prev_clock     ;
@@ -234,8 +241,9 @@ reg             ack          ;
       trig_prev_clock     <= 64'h0;
 
       acp_per_arp         <= 32'h0;
-      prev_acp_count      <= 32'h0;
-
+      acp_at_arp          <= 32'h0;
+      trig_at_arp         <= 32'h0;
+      
       // set thresholds at extremes to prevent triggering
       // before client values have been set
 
@@ -276,8 +284,9 @@ reg             ack          ;
       if (arp_trig_o) begin
          arp_clock           <= clock_counter;
          arp_prev_clock      <= arp_clock;
-         acp_per_arp         <= acp_count - prev_acp_count;
-         prev_acp_count      <= acp_count;
+         acp_per_arp         <= acp_count - acp_at_arp;
+         acp_at_arp          <= acp_count;
+         trig_at_arp         <= trig_count;
       end
       if (radar_trig_o) begin
          trig_clock           <= clock_counter;
@@ -297,6 +306,8 @@ reg             ack          ;
          saved_arp_prev_clock      <=  arp_prev_clock     ;
          saved_clock_counter       <=  clock_counter      ;
          saved_acp_per_arp         <=  acp_per_arp        ;                                
+         saved_acp_at_arp          <=  acp_at_arp         ;                                
+         saved_trig_at_arp         <=  trig_at_arp        ;
          saved_trig_count          <=  trig_count         ;
          saved_trig_clock          <=  trig_clock         ;
          saved_trig_prev_clock     <=  trig_prev_clock    ;
@@ -327,6 +338,8 @@ always @(*) begin
      `OFFSET_CLOCKS_LOW           : begin ack <= 1'b1;  rdata <= {               clock_counter[32-1:  0]  }; end
      `OFFSET_CLOCKS_HIGH          : begin ack <= 1'b1;  rdata <= {               clock_counter[63-1: 32]  }; end
      `OFFSET_ACP_PER_ARP          : begin ack <= 1'b1;  rdata <= {               acp_per_arp              }; end
+     `OFFSET_ACP_AT_ARP           : begin ack <= 1'b1;  rdata <= {               acp_at_arp               }; end
+     `OFFSET_TRIG_AT_ARP          : begin ack <= 1'b1;  rdata <= {               trig_at_arp              }; end
      `OFFSET_ACP_RAW              : begin ack <= 1'b1;  rdata <= {{32-12{1'b0}}, xadc_a_i                 }; end
      `OFFSET_ARP_RAW              : begin ack <= 1'b1;  rdata <= {{32-12{1'b0}}, xadc_b_i                 }; end
      `OFFSET_TRIG_THRESH_EXCITE   : begin ack <= 1'b1;  rdata <= {{32-12{1'b0}}, trig_thresh_excite       }; end
@@ -350,6 +363,8 @@ always @(*) begin
      `OFFSET_SAVED_ARP_PREV_CLOCK_LOW   : begin ack <= 1'b1;  rdata <= { saved_arp_prev_clock[32-1:0]   }; end
      `OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  : begin ack <= 1'b1;  rdata <= { saved_arp_prev_clock[64-1:32]  }; end
      `OFFSET_SAVED_ACP_PER_ARP          : begin ack <= 1'b1;  rdata <= { saved_acp_per_arp              }; end
+     `OFFSET_SAVED_ACP_AT_ARP           : begin ack <= 1'b1;  rdata <= { saved_acp_at_arp               }; end
+     `OFFSET_SAVED_TRIG_AT_ARP          : begin ack <= 1'b1;  rdata <= { saved_trig_at_arp              }; end
      `OFFSET_SAVED_TRIG_COUNT           : begin ack <= 1'b1;  rdata <= { saved_trig_count               }; end
      `OFFSET_SAVED_TRIG_CLOCK_LOW       : begin ack <= 1'b1;  rdata <= { saved_trig_clock[32-1:0]       }; end
      `OFFSET_SAVED_TRIG_CLOCK_HIGH      : begin ack <= 1'b1;  rdata <= { saved_trig_clock[64-1:32]      }; end
