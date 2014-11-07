@@ -263,10 +263,17 @@ void *rp_osc_worker_thread(void *args)
         osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
 
         pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
+        uint32_t trig_count = g_digdar_fpga_reg_mem->saved_trig_count;
         uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
-        pbm->arp_clock = arp_clock_low + (((uint64_t) g_digdar_fpga_reg_mem->saved_arp_clock_high) << 32);
-        // trig clock is relative to arp clock
+        uint32_t arp_clock_high = g_digdar_fpga_reg_mem->saved_arp_clock_high;
         uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
+        uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
+        uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
+        uint32_t acp_at_arp = g_digdar_fpga_reg_mem->saved_acp_at_arp;
+        uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
+        uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
+        pbm->arp_clock = arp_clock_low + (((uint64_t) arp_clock_high) << 32);
+        // trig clock is relative to arp clock
         pbm->trig_clock = trig_clock_low - arp_clock_low;
 
         // acp clock is in [0..1] representing best estimate of the portion of sweep completed
@@ -274,17 +281,17 @@ void *rp_osc_worker_thread(void *args)
         // That is, the number of ACPs / the number of ACPs per sweep, plus a bit of extra
         // based on how long since the last ACP compared to the most recent ACP period
 
-        uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
 
-        pbm->acp_clock = g_digdar_fpga_reg_mem->saved_acp_count - g_digdar_fpga_reg_mem->saved_acp_at_arp; // # of whole ACPs since ARP
-        uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
-        if (acp_period > 0)
-          pbm->acp_clock += (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
+        pbm->acp_clock = acp_count - acp_at_arp; // # of whole ACPs since ARP
+        if (acp_period > 0) {
+          float partial = (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
+          if (partial > 0.0 && partial < 1.0)
+            pbm->acp_clock += partial;
+        }
 
-        uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
         pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
 
-        pbm->num_trig = g_digdar_fpga_reg_mem->saved_trig_count;
+        pbm->num_trig = trig_count; 
 
         // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
         // for this one.

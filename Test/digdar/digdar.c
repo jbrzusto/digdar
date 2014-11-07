@@ -92,7 +92,7 @@ uint16_t num_removals = 0;
 uint16_t spp = 3000;  // samples to grab per radar pulse
 uint32_t decim = 1; // decimation: 1, 2, 8, etc.
 uint16_t num_pulses = 1000; // pulses to maintain in ring buffer (filled by worker thread)
-uint16_t chunk_size = 50; // pulses to transmit per chunk (main thread)
+uint16_t chunk_size = 10; // pulses to transmit per chunk (main thread)
 uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
 
 pulse_metadata *pulse_buffer = 0;
@@ -161,9 +161,9 @@ int main(int argc, char *argv[])
               exit (EXIT_FAILURE );
             }
             *split = '\0';
-            ++num_removals;
             removals[num_removals].begin = atoi(optarg);
             removals[num_removals].end = atoi(split + 1);
+            ++num_removals;
           };
           break;
         case 'v':
