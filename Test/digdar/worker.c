@@ -256,6 +256,9 @@ void *rp_osc_worker_thread(void *args)
     int16_t n = 0;  // number of pulses written to chunk
     int16_t cur_pulse = 0; // index of current pulse in ring buffer
 
+    struct timespec rtc = {0, 0}; // realtime clock for start of pulse digitizing
+    uint32_t prev_arp_clock_low = 0;   // saved arp clock (125 MHz digitizing clock); used to detect new ARP
+
     /* Continuous thread loop (exited only with 'quit' state) */
     while(1) {
       if (n == chunk_size) {
@@ -303,7 +306,6 @@ void *rp_osc_worker_thread(void *args)
 
       uint32_t trig_count = g_digdar_fpga_reg_mem->saved_trig_count - g_digdar_fpga_reg_mem->saved_trig_at_arp;
       uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
-      uint32_t arp_clock_high = g_digdar_fpga_reg_mem->saved_arp_clock_high;
       uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
       uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
       uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
@@ -312,9 +314,37 @@ void *rp_osc_worker_thread(void *args)
       uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
       uint32_t arp_count = g_digdar_fpga_reg_mem->saved_arp_count;
 
-      pbm->arp_clock = arp_clock_low + (((uint64_t) arp_clock_high) << 32);
       // trig clock is relative to arp clock
       pbm->trig_clock = trig_clock_low - arp_clock_low;
+
+      // outgoing arp_clock_sec and arp_clock_nsec fields are set using a time pin:
+      // whenever we notice a change in arp clock ticks, we grab the system time.
+
+      // we only check the low order 32-bits of clock, because there's no
+      // way it could have wrapped the full 32-bit range between two heading pulses 
+      // (that would be ~32 seconds)
+      if (arp_clock_low != prev_arp_clock_low) {
+        // we're onto a new ARP, so back-calculate what the RTC would have been
+        // given that the current rtc corresponds to the current pulse, which
+        // has come some time after the ARP.
+
+        // First, pin the ADC clock to the red pitaya's RTC
+        uint32_t adc_clock = (uint32_t) g_digdar_fpga_reg_mem->clocks; // lower order ADC clocks
+        clock_gettime(CLOCK_REALTIME, &rtc);
+
+        // back-calculate to time of ARP pulse
+        rtc.tv_nsec -= 8 * (adc_clock - arp_clock_low); // @ 125 MHz, each ADC clock tick is 8ns
+        if (rtc.tv_nsec < 0) {
+          --rtc.tv_sec;
+          rtc.tv_nsec += 1000000000;
+        }
+        prev_arp_clock_low = arp_clock_low;
+      }
+      // this is a bit dumb; we're recording the high-res ARP timestamp with
+      // each digitized pulse, even though it only changes once per sweep.
+
+      pbm->arp_clock_sec = rtc.tv_sec;
+      pbm->arp_clock_nsec = rtc.tv_nsec;
 
       // acp clock is in [0..1] representing best estimate of the portion of sweep completed
       // since the most recent arp
