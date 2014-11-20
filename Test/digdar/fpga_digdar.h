@@ -224,7 +224,7 @@ typedef struct osc_fpga_reg_mem_s {
      */
     uint32_t chb_filt_pp;            
 
-    /** @brief Flag - only record samples after triggered
+    /** @brief Extra options:
      * bit [0] - if 1, only record samples after trigger detected
      *            this serves to protect a digitized pulse, so that
      *            we can be reading it from BRAM into DRAM while the FPGA
@@ -232,9 +232,12 @@ typedef struct osc_fpga_reg_mem_s {
      *            of samples to be digitized is <= 1/2 the buffer size of 16 k samples)
      * bit [1] - if 1, ADC A negates values and returns in 2s complement; otherwise, 
      *           values are returned as-is.
+     * bit [2] - use 32-bit reads from buffers
+     * bit [3] - use counting mode, not real ADC samples; for debugging only
+     * bit [4] - return sample sum, not average, for decimation rates <= 4 (returns as 16-bit)
      * bits [31:2] - reserved
      */
-    uint32_t post_trig_only;
+    uint32_t digdar_extra_options;
   
     /** @brief  ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
      * 0x20000 and are each 16k samples long */

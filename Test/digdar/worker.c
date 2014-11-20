@@ -198,12 +198,40 @@ int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update)
 }
 
 
-static uint16_t cur_pulse = 0; // index into pulses buffer
+static int16_t reader_chunk_index = -1; // which chunk is currently being read by the export thread
+static int16_t writer_chunk_index = 0;  // which chunk is currently being written by the capture thread
 
-uint16_t rp_osc_get_current_pulse_index() {
-  uint16_t rv;
+int16_t rp_osc_get_chunk_index_for_reader() {
+  // return the index of a chunk which the reader can read from.
+  // It must already have been filled by writer.
+  int16_t rv;
   pthread_mutex_lock(&rp_osc_ctrl_mutex);
-  rv = cur_pulse;
+  // try bump up to the next chunk in the ring
+  rv = (1 + reader_chunk_index) % num_chunks;
+  // if it's the writer's chunk, we fail
+  if (rv == writer_chunk_index)
+    rv = -1;
+  else
+    reader_chunk_index = rv;
+  // Note: it's possible the writer has passed us,
+  // in which case it makes more sense to skip the
+  // as-yet unwritten chunks, because otherwise we'll
+  // be interleaving new and old ones.
+  pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+  return rv;
+};
+  
+int16_t rp_osc_get_chunk_index_for_writer() {
+  // return the index of a chunk which the writer can write to.
+  // Normally, it's the next chunk in the ring, except that
+  // we skip over the reader's current chunk.
+
+  int16_t rv;
+  pthread_mutex_lock(&rp_osc_ctrl_mutex);
+  rv = (1 + writer_chunk_index) % num_chunks;
+  if (rv == reader_chunk_index)
+    rv = (1 + rv) % num_chunks;
+  writer_chunk_index = rv;
   pthread_mutex_unlock(&rp_osc_ctrl_mutex);
   return(rv);
 };
@@ -221,141 +249,152 @@ void *rp_osc_worker_thread(void *args)
 
     osc_fpga_set_decim(decim);
 
-    static int did_first_arm = 0;
+    int did_first_arm = 0;
 
     int32_t *max_data = & rp_fpga_cha_signal[16384];
 
+    int16_t n = 0;  // number of pulses written to chunk
+    int16_t cur_pulse = 0; // index of current pulse in ring buffer
+
     /* Continuous thread loop (exited only with 'quit' state) */
     while(1) {
-        state = rp_osc_ctrl;
+      if (n == chunk_size) {
+        cur_pulse = rp_osc_get_chunk_index_for_writer() * chunk_size;
+        n = 0;
+      }
+      state = rp_osc_ctrl;
 
-        /* request to stop worker thread, we will shut down */
+      /* request to stop worker thread, we will shut down */
 
-        if(state == rp_osc_quit_state) {
-            return 0;
-        }
+      if(state == rp_osc_quit_state) {
+        return 0;
+      }
 
-        if(state == rp_osc_idle_state) {
-            usleep(10000);
-            continue;
-        }
+      if(state == rp_osc_idle_state) {
+        usleep(10000);
+        continue;
+      }
 
-        if(state != rp_osc_start_state) {
-          usleep(1000);
-          continue;
-        }
+      if(state != rp_osc_start_state) {
+        usleep(1000);
+        continue;
+      }
 
-        if (! did_first_arm) {
-          osc_fpga_arm_trigger();
-          osc_fpga_set_trigger(10);
-          did_first_arm = 1;
-        }
-
-        if( ! osc_fpga_triggered()) {
-          usleep(10);
-          sched_yield();
-          continue;
-        }
-
-        // get trigger write pointer (i.e. where do data start?)
-        int32_t tr_ptr;
-        int32_t wr_ptr;
-        osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
-
-        pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
-        uint32_t trig_count = g_digdar_fpga_reg_mem->saved_trig_count;
-        uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
-        uint32_t arp_clock_high = g_digdar_fpga_reg_mem->saved_arp_clock_high;
-        uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
-        uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
-        uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
-        uint32_t acp_at_arp = g_digdar_fpga_reg_mem->saved_acp_at_arp;
-        uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
-        uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
-        pbm->arp_clock = arp_clock_low + (((uint64_t) arp_clock_high) << 32);
-        // trig clock is relative to arp clock
-        pbm->trig_clock = trig_clock_low - arp_clock_low;
-
-        // acp clock is in [0..1] representing best estimate of the portion of sweep completed
-        // since the most recent arp
-        // That is, the number of ACPs / the number of ACPs per sweep, plus a bit of extra
-        // based on how long since the last ACP compared to the most recent ACP period
-
-
-        pbm->acp_clock = acp_count - acp_at_arp; // # of whole ACPs since ARP
-        if (acp_period > 0) {
-          float partial = (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
-          if (partial > 0.0 && partial < 1.0)
-            pbm->acp_clock += partial;
-        }
-
-        pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
-
-        pbm->num_trig = trig_count; 
-
-        // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
-        // for this one.
-
+      if (! did_first_arm) {
         osc_fpga_arm_trigger();
-        
-        /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
         osc_fpga_set_trigger(10);
+        did_first_arm = 1;
+      }
 
-        /* check whether this pulse is in a removal segment */
-        if (num_removals) {
-          int keep = 1;
-          float rr = pbm->acp_clock;
-          for (int i = 0; keep && i < num_removals; ++i) {
-            if (removals[i].begin <= removals[i].end) {
-              if (rr >= removals[i].begin && rr <= removals[i].end)
-                keep = 0;
-            } else if (rr >= removals[i].begin || rr <= removals[i].end)
+      if( ! osc_fpga_triggered()) {
+        usleep(10);
+        sched_yield();
+        continue;
+      }
+
+      // get trigger write pointer (i.e. where do data start?)
+      int32_t tr_ptr;
+      int32_t wr_ptr;
+      osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
+
+      pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
+
+      // read ARP registers
+
+      uint32_t trig_count = g_digdar_fpga_reg_mem->saved_trig_count - g_digdar_fpga_reg_mem->saved_trig_at_arp;
+      uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
+      uint32_t arp_clock_high = g_digdar_fpga_reg_mem->saved_arp_clock_high;
+      uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
+      uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
+      uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
+      uint32_t acp_at_arp = g_digdar_fpga_reg_mem->saved_acp_at_arp;
+      uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
+      uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
+      uint32_t arp_count = g_digdar_fpga_reg_mem->saved_arp_count;
+
+      pbm->arp_clock = arp_clock_low + (((uint64_t) arp_clock_high) << 32);
+      // trig clock is relative to arp clock
+      pbm->trig_clock = trig_clock_low - arp_clock_low;
+
+      // acp clock is in [0..1] representing best estimate of the portion of sweep completed
+      // since the most recent arp
+      // That is, the number of ACPs / the number of ACPs per sweep, plus a bit of extra
+      // based on how long since the last ACP compared to the most recent ACP period
+
+      pbm->acp_clock = acp_count - acp_at_arp; // # of whole ACPs since ARP
+      if (acp_period > 0) {
+        float partial = (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
+        // FIXME: sometimes partial is much larger than 1.0 - this is clearly incorrect, but
+        // why does it happen?  For now, use a basic sanity check.
+        if (partial > 0.0 && partial < 1.0)
+          pbm->acp_clock += partial;
+      }
+
+      pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
+
+      pbm->num_trig = trig_count; 
+
+      pbm->num_arp = arp_count; 
+
+      // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
+      // for this one.
+
+      osc_fpga_arm_trigger();
+        
+      /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
+      osc_fpga_set_trigger(10);
+
+      /* check whether this pulse is in a removal segment */
+      if (num_removals) {
+        int keep = 1;
+        float rr = pbm->acp_clock;
+        for (int i = 0; keep && i < num_removals; ++i) {
+          if (removals[i].begin <= removals[i].end) {
+            if (rr >= removals[i].begin && rr <= removals[i].end)
               keep = 0;
-          }
-          if (! keep)
-            continue;
+          } else if (rr >= removals[i].begin || rr <= removals[i].end)
+            keep = 0;
         }
+        if (! keep)
+          continue;
+      }
 
-        uint16_t * data = & pbm->data[0];
-        int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
-        uint16_t n1 = max_data - src_data;
-        uint16_t n2;
-        if (n1 >= spp) {
-          n1 = spp;
-          n2 = 0;
-        } else {
-          n2 = spp - n1;
-        }
-        uint16_t i=0;
-        // when tr_ptr is odd, we need to start with the higher-order word
-        uint32_t tmp;
-        if (tr_ptr & 1) {
-          tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-          data[0] = tmp >> 16;
-          ++i;
-        }
-        for (/**/ ; i < n1; ++i) {
+      uint16_t * data = & pbm->data[0];
+      int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
+      uint16_t n1 = max_data - src_data;
+      uint16_t n2;
+      if (n1 >= spp) {
+        n1 = spp;
+        n2 = 0;
+      } else {
+        n2 = spp - n1;
+      }
+      uint16_t i=0;
+      // when tr_ptr is odd, we need to start with the higher-order word
+      uint32_t tmp;
+      if (tr_ptr & 1) {
+        tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
+        data[0] = tmp >> 16;
+        ++i;
+      }
+      for (/**/ ; i < n1; ++i) {
+        tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
+        data[i] = tmp & 0xffff;
+        if (++i < n1)
+          data[i] = tmp >> 16;
+      }
+      if (n2) {
+        src_data = & rp_fpga_cha_signal[0];
+        data = &data[i];
+        for (i = 0; i < n2; ++i) {
           tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
           data[i] = tmp & 0xffff;
-          if (++i < n1)
+          if (++i < n2)
             data[i] = tmp >> 16;
         }
-        if (n2) {
-          src_data = & rp_fpga_cha_signal[0];
-          data = &data[i];
-          for (i = 0; i < n2; ++i) {
-            tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-            data[i] = tmp & 0xffff;
-            if (++i < n2)
-              data[i] = tmp >> 16;
-          }
-        }
-
-        pthread_mutex_lock(&rp_osc_ctrl_mutex);
-        ++cur_pulse;
-        if (cur_pulse == num_pulses)
-          cur_pulse = 0;
-        pthread_mutex_unlock(&rp_osc_ctrl_mutex);
+      }
+      ++cur_pulse;
+      ++n;
     }
     return 0;
 }

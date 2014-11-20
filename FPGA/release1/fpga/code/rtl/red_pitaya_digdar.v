@@ -309,8 +309,8 @@ reg             ack          ;
          saved_acp_at_arp          <=  acp_at_arp         ;                                
          saved_trig_at_arp         <=  trig_at_arp        ;
          saved_trig_count          <=  trig_count         ;
-         saved_trig_clock          <=  trig_clock         ;
-         saved_trig_prev_clock     <=  trig_prev_clock    ;
+         saved_trig_clock          <=  clock_counter      ; // NB: not trig_clock, since that's not valid until the next tick.
+         saved_trig_prev_clock     <=  trig_clock         ;
       end
    end // else: !if(adc_rstn_i == 1'b0)
 end

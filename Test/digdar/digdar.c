@@ -23,6 +23,9 @@
 #include <getopt.h>
 #include <string.h>
 #include <sys/param.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
 
 #include "digdar.h"
 #include "main_digdar.h"
@@ -70,7 +73,10 @@ void usage() {
     "\n"
     "Usage: %s [OPTION]\n"
     "\n"
-    "  --decim  -d DECIM   Decimation rate: one of 1, 2, 8, 64, 1024, 8192, or 65536\n"
+    "  --decim  -d DECIM   Decimation rate: one of 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n"
+    "  --sum   If specified, return the sum (in 16-bits) of samples in the decimation period.\n"
+    "          e.g. instead of returning (x[0]+x[1])/2 at decimation rate 2, return x[0]+x[1]\n"
+    "          Only valid if the decimation rate is <= 4 so that the sum fits in 16 bits\n"
     "  --samples   -n SAMPLES   Samples per pulse. (Up to 16384; default is 3000)\n"
     "  --pulses -p PULSES Number of pulses to allocate buffer for (default, 1000)\n"
     "  --remove -r START:END  Remove sector.  START and END are portions of the circle in [0, 1]\n"
@@ -79,6 +85,8 @@ void usage() {
     "                         If START > END, the removed sector consists of [END, 1] U [0, START].\n"
     "                         Multiple --remove options may be given.\n"
     "  --chunk_size -c Number of pulses to transfer in each chunk\n"
+    "  --tcp HOST:PORT instead of writing to stdout, open a TCP socket connection to PORT on HOST and\n"
+    "                  write there.\n"
     "  --version       -v    Print version info.\n"
     "  --help          -h    Print this message.\n"
     "\n";
@@ -93,7 +101,19 @@ uint16_t spp = 3000;  // samples to grab per radar pulse
 uint32_t decim = 1; // decimation: 1, 2, 8, etc.
 uint16_t num_pulses = 1000; // pulses to maintain in ring buffer (filled by worker thread)
 uint16_t chunk_size = 10; // pulses to transmit per chunk (main thread)
+uint16_t num_chunks = 0; // number of pulses per chunk
 uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
+uint16_t use_sum = 0; // if non-zero, return sum of samples rather than truncated average
+int outfd = -1; // file descriptor for output; fileno(stdout) by default;
+
+// boilerplate ougoing socket connection fields, from Linux man-pages
+
+struct addrinfo hints;
+struct addrinfo *result, *rp;
+int sfd, s;
+struct sockaddr_storage peer_addr;
+socklen_t peer_addr_len;
+ssize_t nread;
 
 pulse_metadata *pulse_buffer = 0;
 
@@ -112,14 +132,16 @@ int main(int argc, char *argv[])
             /* These options set a flag. */
             {"decim", required_argument,       0, 'd'},
             {"samples",      required_argument,       0, 'n'},
+            {"sum",      no_argument,       0, 's'},
             {"pulses",       required_argument,       0, 'p'},
             {"chunk_size",    required_argument,          0, 'c'},
             {"remove",    required_argument,          0, 'r'},
+            {"tcp",    required_argument,          0, 't'},
             {"version",      no_argument,       0, 'v'},
             {"help",         no_argument,       0, 'h'},
             {0, 0, 0, 0}
     };
-    const char *optstring = "c:d:hn:p:r:v";
+    const char *optstring = "c:d:hn:p:r:st:v";
 
     /* getopt_long stores the option index here. */
     int option_index = 0;
@@ -161,10 +183,59 @@ int main(int argc, char *argv[])
               exit (EXIT_FAILURE );
             }
             *split = '\0';
-            removals[num_removals].begin = atoi(optarg);
-            removals[num_removals].end = atoi(split + 1);
+            removals[num_removals].begin = atof(optarg);
+            removals[num_removals].end = atof(split + 1);
             ++num_removals;
           };
+          break;
+
+        case 's':
+          use_sum = 1;
+          break;
+
+        case 't':
+          {
+            char *port = strchr(optarg, ':');
+            if (! port) {
+              usage();
+              exit ( EXIT_FAILURE );
+            }
+            
+            memset(&hints, 0, sizeof(struct addrinfo));
+            hints.ai_family = AF_INET;    /* Allow IPv4 only */
+            hints.ai_socktype = SOCK_STREAM; /* Stream socket */
+            hints.ai_flags = 0;
+            hints.ai_protocol = 0;          /* Any protocol */
+
+            *port++ = '\0';
+            s = getaddrinfo(optarg, port, &hints, &result);
+            if (s != 0) {
+              fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+              exit(EXIT_FAILURE);
+            }
+
+           /* getaddrinfo() returns a list of address structures.
+              Try each address until we successfully connect(2).
+              If socket(2) (or connect(2)) fails, we (close the socket
+              and) try the next address. */
+
+           for (rp = result; rp != NULL; rp = rp->ai_next) {
+               outfd = socket(rp->ai_family, rp->ai_socktype,
+                            rp->ai_protocol);
+               if (outfd == -1)
+                   continue;
+
+               if (connect(outfd, rp->ai_addr, rp->ai_addrlen) != -1)
+                   break;                  /* Success */
+
+               close(outfd);
+           }
+
+           if (rp == NULL) {               /* No address succeeded */
+               fprintf(stderr, "Could not connect\n");
+               exit(EXIT_FAILURE);
+           }
+          }
           break;
         case 'v':
             fprintf(stdout, "%s version %s-%s\n", g_argv0, VERSION_STR, REVISION_STR);
@@ -180,6 +251,8 @@ int main(int argc, char *argv[])
     switch(decim) {
     case 1: 
     case 2:
+    case 3:
+    case 4:
     case 8:
     case 64:
     case 1024:
@@ -187,7 +260,7 @@ int main(int argc, char *argv[])
     case 65536: 
       break;
     default:
-      fprintf(stderr, "incorrect value (%d) for decimation; must be 1, 2, 8, 64, 1024, 8192, or 65536\n", decim);
+      fprintf(stderr, "incorrect value (%d) for decimation; must be 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n", decim);
       return -1;
     }
     t_params[DECIM_FACTOR_PARAM] = decim;
@@ -195,6 +268,15 @@ int main(int argc, char *argv[])
     if (spp > 16384 || spp < 0) {
       fprintf(stderr, "incorrect value (%d) for samples per pulse; must be 0..16384\n", spp);
       return -1;
+    }
+
+    if (use_sum && decim > 4) {
+      fprintf(stderr, "cannot specify --sum when decimation rate is > 4\n");
+      return -1;
+    }
+
+    if (outfd == -1) {
+      outfd = fileno(stdout);
     }
 
     /* Standard radar triggering mode */
@@ -224,6 +306,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
+    num_chunks = num_pulses / chunk_size;
     // fill in magic number in pulse headers
 
     for (int i = 0; i < num_pulses; ++i) {
@@ -237,34 +320,17 @@ int main(int argc, char *argv[])
 
     rp_osc_worker_change_state(rp_osc_start_state);
 
-    uint16_t my_cur_pulse = 0;
+    int16_t cur_pulse; // index of current pulse in ring buffer
 
-    // NB: should use boost circular_buffer here
-
-    while(1) { 
-      uint16_t cur_pulse = rp_osc_get_current_pulse_index();
-      uint16_t nc1, nc2;
-      if (cur_pulse < my_cur_pulse) {
-        nc1 = num_pulses - my_cur_pulse;
-        nc2 = cur_pulse;
-      } else {
-        nc1 = cur_pulse - my_cur_pulse;
-        nc2 = 0;
+    /* Continuous thread loop (exited only with 'quit' state) */
+    while(1) {
+      cur_pulse = rp_osc_get_chunk_index_for_reader() * chunk_size;
+      if (cur_pulse < 0) {
+        usleep(20);
+        sched_yield();
+        continue;
       }
-      if (nc1 + nc2 >= chunk_size) {
-        if (nc1 > 0) {
-          fwrite(((char *) pulse_buffer) + my_cur_pulse * psize, nc1, psize, stdout);
-          my_cur_pulse += nc1;
-          if (my_cur_pulse == num_pulses)
-            my_cur_pulse = 0;
-        }
-        if (nc2 > 0) {
-          fwrite(((char *) pulse_buffer) + my_cur_pulse * psize, nc2, psize, stdout);
-          my_cur_pulse += nc2;
-        }
-      }
-      usleep(20);
-      sched_yield();
+      write(outfd, ((char *) pulse_buffer) + cur_pulse * psize, chunk_size * psize);
     }
     return 0;
 }

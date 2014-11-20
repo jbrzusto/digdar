@@ -91,10 +91,10 @@ reg             err          ;
 reg             ack          ;
 reg             adc_arm_do   ;
 reg             adc_rst_do   ;
-reg [32-1:0]    post_trig_only;
+reg [32-1:0] digdar_extra_options;
 reg [ 32-1:0 ] bogus_reg   ;
 
-reg [14-1:0] counter; // counter for counting mode
+reg [16-1:0] adc_counter; // counter for counting mode
    
 
 
@@ -102,8 +102,8 @@ reg [14-1:0] counter; // counter for counting mode
 //---------------------------------------------------------------------------------
 //  Input filtering
 
-wire [ 14-1: 0] adc_a_filt_in  ;
-wire [ 14-1: 0] adc_a_filt_out ;
+wire [ 16-1: 0] adc_a_filt_in  ;
+wire [ 16-1: 0] adc_a_filt_out ;
 wire [ 14-1: 0] adc_b_filt_in  ;
 wire [ 14-1: 0] adc_b_filt_out ;
 reg  [ 18-1: 0] set_a_filt_aa  ;
@@ -115,7 +115,7 @@ reg  [ 25-1: 0] set_b_filt_bb  ;
 reg  [ 25-1: 0] set_b_filt_kk  ;
 reg  [ 25-1: 0] set_b_filt_pp  ;
 
-assign adc_a_filt_in = adc_a_i ;
+assign adc_a_filt_in = $signed(adc_a_i); // sign extend to 16 bits
 assign adc_b_filt_in = adc_b_i ;
 
 // red_pitaya_dfilt1 i_dfilt1_cha
@@ -134,7 +134,7 @@ assign adc_b_filt_in = adc_b_i ;
 // );
 
    // no input filtering
-assign adc_a_filt_out = counting_mode ? counter : adc_a_filt_in;
+assign adc_a_filt_out = counting_mode ? adc_counter : adc_a_filt_in;
    
 red_pitaya_dfilt1 i_dfilt1_chb
 (
@@ -158,7 +158,7 @@ red_pitaya_dfilt1 i_dfilt1_chb
 //---------------------------------------------------------------------------------
 //  Decimate input data
 
-reg  [ 14-1: 0] adc_a_dat     ;
+reg  [ 16-1: 0] adc_a_dat     ;
 reg  [ 14-1: 0] adc_b_dat     ;
 reg  [ 32-1: 0] adc_a_sum     ;
 reg  [ 32-1: 0] adc_b_sum     ;
@@ -176,7 +176,7 @@ always @(posedge adc_clk_i) begin
       
    end
    else begin
-      counter <= 14'b1 + counter;
+      adc_counter <= adc_counter + 16'b1;
       
       if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
          adc_dec_cnt <= 17'h1                   ;
@@ -191,18 +191,32 @@ always @(posedge adc_clk_i) begin
 
       adc_dv <= (adc_dec_cnt >= set_dec) ;
 
-      case (set_dec & {17{set_avg_en}})
-         17'h0     : begin adc_a_dat <= adc_a_filt_out;            adc_b_dat <= adc_b_filt_out;        end
-         17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
-         17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
-         17'h8     : begin adc_a_dat <= adc_a_sum[15+3 :  3];      adc_b_dat <= adc_b_sum[15+3 :  3];  end
-         17'h40    : begin adc_a_dat <= adc_a_sum[15+6 :  6];      adc_b_dat <= adc_b_sum[15+6 :  6];  end
-         17'h400   : begin adc_a_dat <= adc_a_sum[15+10: 10];      adc_b_dat <= adc_b_sum[15+10: 10];  end
-         17'h2000  : begin adc_a_dat <= adc_a_sum[15+13: 13];      adc_b_dat <= adc_b_sum[15+13: 13];  end
-         17'h10000 : begin adc_a_dat <= adc_a_sum[15+16: 16];      adc_b_dat <= adc_b_sum[15+16: 16];  end
-         default   : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
-      endcase
-
+      if (use_sum) begin
+         // for decimation rates <= 4, the sum fits in 16 bits, so we can return
+         // that instead of the average, retaining some bits.
+         if (set_avg_en) begin
+           adc_a_dat <= adc_a_sum[15+0 :  0];
+           adc_b_dat <= adc_b_sum[15+0 :  0];  
+         end
+         else begin// not average, just return decimated sample
+           adc_a_dat <= adc_a_filt_out;
+           adc_b_dat <= adc_b_filt_out;
+         end
+      end
+      else begin
+           case (set_dec & {17{set_avg_en}})
+               17'h0     : begin adc_a_dat <= adc_a_filt_out;            adc_b_dat <= adc_b_filt_out;        end
+               17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
+               17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
+               17'h4     : begin adc_a_dat <= adc_a_sum[15+2 :  2];      adc_b_dat <= adc_b_sum[15+2 :  2];  end
+               17'h8     : begin adc_a_dat <= adc_a_sum[15+3 :  3];      adc_b_dat <= adc_b_sum[15+3 :  3];  end
+               17'h40    : begin adc_a_dat <= adc_a_sum[15+6 :  6];      adc_b_dat <= adc_b_sum[15+6 :  6];  end
+               17'h400   : begin adc_a_dat <= adc_a_sum[15+10: 10];      adc_b_dat <= adc_b_sum[15+10: 10];  end
+               17'h2000  : begin adc_a_dat <= adc_a_sum[15+13: 13];      adc_b_dat <= adc_b_sum[15+13: 13];  end
+               17'h10000 : begin adc_a_dat <= adc_a_sum[15+16: 16];      adc_b_dat <= adc_b_sum[15+16: 16];  end
+               default   : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
+           endcase
+       end
    end
 end
 
@@ -219,11 +233,11 @@ end
 localparam RSZ = 14 ;  // RAM size 2^RSZ
 
 
-reg   [28-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
-reg [28-1: 0] adc_a_tmp ; // temporary register for accumulating two 14-bit samples before saving to buffer
+reg [32-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
+reg [32-1: 0] adc_a_tmp ; // temporary register for accumulating two 16-bit samples before saving to buffer
    
 reg   [14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
-reg   [28-1: 0] adc_a_rd       ;
+reg   [32-1: 0] adc_a_rd       ;
 reg   [14-1: 0] adc_b_rd       ;
 reg   [12-1: 0] xadc_a_buf [0:(1<<RSZ)-1] ;
 reg   [12-1: 0] xadc_b_buf [0:(1<<RSZ)-1] ;
@@ -250,11 +264,16 @@ reg               adc_dly_do    ;
 
 assign adc_ready_o = adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
 
-assign negate = post_trig_only[1]; // extra bit: 1 means reverse range of ADC values.
+assign post_trig_only = digdar_extra_options[0]; // 1 means only record values to buffer *after* triggering, 
+                                                 // so we don't overwrite captured samples while the reader is coping them
 
-assign read32 = post_trig_only[2]; // 1 means reads from buffers are 32 bits, not 16, with specified address in lower 16 bits, next address in upper 16 bits
+assign negate = digdar_extra_options[1]; // 1 means reverse range of ADC values.
 
-assign counting_mode = post_trig_only[3]; // 1 means we use a counter instead of the real adc values
+assign read32 = digdar_extra_options[2]; // 1 means reads from buffers are 32 bits, not 16, with specified address in lower 16 bits, next address in upper 16 bits
+
+assign counting_mode = digdar_extra_options[3]; // 1 means we use a counter instead of the real adc values
+
+assign use_sum = digdar_extra_options[4] & (set_dec <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
     
 // Write
 always @(posedge adc_clk_i) begin
@@ -268,7 +287,7 @@ always @(posedge adc_clk_i) begin
    end
    else begin
       if (adc_arm_do) 
-        adc_we <= ~post_trig_only[0];
+        adc_we <= ~post_trig_only;
 //        adc_we <= 1'b1 ;
       else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
          adc_we <= 1'b0 ;
@@ -311,8 +330,9 @@ end
 
 always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
-      // Note: the adc_a buffer is 28 bits wide, so we only write into it on every 2nd sample
-      adc_a_tmp <= {adc_a_tmp[14-1:0], negate ? {adc_a_dat[14-1], ~adc_a_dat[13-1:0]} : adc_a_dat} ;
+      // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
+      // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits
+      adc_a_tmp <= {negate ? {adc_a_dat[16-1], ~adc_a_dat[15-1:0]} : adc_a_dat, adc_a_tmp[32-1:16] } ; 
       if (adc_wp[0]) begin
          adc_a_buf[adc_wp[RSZ-1:1]] <= adc_a_tmp;
       end
@@ -338,7 +358,7 @@ always @(posedge adc_clk_i) begin
    xadc_a_raddr   <= adc_a_raddr     ; // double register 
    xadc_b_raddr   <= adc_b_raddr     ; // otherwise memory corruption at reading
    adc_a_rd       <= adc_a_buf[adc_a_raddr[RSZ-1:1]] ;
-   adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 14 bits of 28 bit value in adc_a_rd; else use lower 14 bits   
+   adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 16 bits of 32 bit value in adc_a_rd; else use lower 16 bits   
    adc_b_rd       <= adc_b_buf[adc_b_raddr] ;
    xadc_a_rd      <= xadc_a_buf[xadc_a_raddr] ;
    xadc_b_rd      <= xadc_b_buf[xadc_b_raddr] ;
@@ -588,8 +608,8 @@ always @(posedge adc_clk_i) begin
       set_b_filt_bb <=  25'h0      ;
       set_b_filt_kk <=  25'hFFFFFF ;
       set_b_filt_pp <=  25'h0      ;
-      post_trig_only <= 32'h0      ;
-      counter       <=  14'h0      ;
+      digdar_extra_options <= 32'h0      ;
+      adc_counter       <=  14'h0      ;
    end
    else begin
       if (wen) begin
@@ -609,7 +629,7 @@ always @(posedge adc_clk_i) begin
          if (addr[19:0]==20'h44)   set_b_filt_bb <= wdata[25-1:0] ;
          if (addr[19:0]==20'h48)   set_b_filt_kk <= wdata[25-1:0] ;
          if (addr[19:0]==20'h4C)   set_b_filt_pp <= wdata[25-1:0] ;
-         if (addr[19:0]==20'h50)   post_trig_only <= wdata[32-1:0] ; 
+         if (addr[19:0]==20'h50)   digdar_extra_options <= wdata[32-1:0] ; 
       end
    end
 end
@@ -645,9 +665,10 @@ always @(*) begin
      20'h00044 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_bb}      ; end
      20'h00048 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_kk}      ; end
      20'h0004C : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_b_filt_pp}      ; end
-     20'h00050 : begin ack <= 1'b1;          rdata <= {post_trig_only}      ; end
+     20'h00050 : begin ack <= 1'b1;          rdata <= digdar_extra_options                ; end
+     20'h00054 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, adc_counter}      ; end
 
-     20'h1???? : begin ack <= adc_rd_dv;     rdata <= read32 ? {2'h0, adc_a_rd[28-1:14], 2'h0, adc_a_rd[14-1:0]} :  {16'h0, 2'h0, adc_a_word_sel ? adc_a_rd[28-1:14] : adc_a_rd[14-1:0]}             ; end
+     20'h1???? : begin ack <= adc_rd_dv;     rdata <= read32 ? adc_a_rd :  {16'h0, adc_a_word_sel ? adc_a_rd[32-1:16] : adc_a_rd[16-1:0]}             ; end
      20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
 
      20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}            ; end
