@@ -18,7 +18,7 @@ VERSION ?= 0.00-0000
 REVISION ?= devbuild
 
 # List of compiled object files (not yet linked to executable)
-OBJS = fpga_digdar.o main_digdar.o worker.o digdar.o
+OBJS = fpga_digdar.o main_digdar.o worker.o digdar.o sqlite3.o capture_db.o
 # List of raw source files (all object files, renamed from .o to .c)
 SRCS = $(subst .o,.c, $(OBJS)))
 
@@ -29,16 +29,20 @@ TARGET=digdar
 ##CFLAGS=-g3 -std=gnu99 -Wall -Werror
 CFLAGS=-O2 -std=gnu99 -Wall -Werror
 CFLAGS += -DVERSION=$(VERSION) -DREVISION=$(REVISION)
+CPPOPTS=-std=c++11  -fPIC -O2
+##CPPOPTS=-g3 -std=c++11  -fPIC 
 
 # Red Pitaya common SW directory
 SHARED=../../shared/
 
 # Additional libraries which needs to be dynamically linked to the executable
 # -lm - System math library (used by cos(), sin(), sqrt(), ... functions)
-LIBS=-lm -lpthread
+LIBS=-lm -lpthread -lrt -ldl -lstdc++
 
 # Main GCC executable (used for compiling and linking)
 CC=$(CROSS_COMPILE)gcc
+CPP=$(CROSS_COMPILE)g++
+
 # Installation directory
 INSTALL_DIR ?= .
 
@@ -65,8 +69,14 @@ all: $(TARGET)
 %.o: %.c version.h
 	$(CC) -c $(CFLAGS) $< -o $@
 
+%.o: %.cc version.h
+	$(CPP) -c $(CPPOPTS) $< -o $@
+
 # Makefile target with rules how to link executable for each target from $(TARGET)
 # list.
+capture_db.o: capture_db.h capture_db.cc
+	$(CPP) $(CPPOPTS) -o $@ -c capture_db.cc
+
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
@@ -77,6 +87,7 @@ version.h:
 # Clean target - when called it cleans all object files and executables.
 clean:
 	rm -f $(TARGET) *.o
+
 
 # Install target - creates 'bin/' sub-directory in $(INSTALL_DIR) and copies all
 # executables to that location.

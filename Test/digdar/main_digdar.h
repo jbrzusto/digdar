@@ -18,6 +18,10 @@
 #ifndef __MAIN_DIGDAR_H
 #define __MAIN_DIGDAR_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "digdar.h"
 
 /** @defgroup main_digdar_h main_digdar_h
@@ -87,4 +91,7 @@ int rp_app_exit(void);
 int rp_set_params(float *p, int len);
 int rp_get_params(float **p);
 
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 #endif /*  __MAIN_DIGDAR_H */

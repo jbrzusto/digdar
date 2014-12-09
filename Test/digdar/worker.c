@@ -245,7 +245,7 @@ void *rp_osc_worker_thread(void *args)
     pthread_mutex_unlock(&rp_osc_ctrl_mutex);
 
     /* set number of samples to collect after triggering */
-    osc_fpga_set_trigger_delay(spp);
+    osc_fpga_set_trigger_delay(n_samples);
 
     osc_fpga_set_decim(decim);
 
@@ -317,6 +317,8 @@ void *rp_osc_worker_thread(void *args)
       // trig clock is relative to arp clock
       pbm->trig_clock = trig_clock_low - arp_clock_low;
 
+      // FIXME: do the ADC / RTC time pinning in the writer thread, not here,
+      // so that we don't do a mode switch.
       // outgoing arp_clock_sec and arp_clock_nsec fields are set using a time pin:
       // whenever we notice a change in arp clock ticks, we grab the system time.
 
@@ -382,8 +384,9 @@ void *rp_osc_worker_thread(void *args)
           if (removals[i].begin <= removals[i].end) {
             if (rr >= removals[i].begin && rr <= removals[i].end)
               keep = 0;
-          } else if (rr >= removals[i].begin || rr <= removals[i].end)
+          } else if (rr >= removals[i].begin || rr <= removals[i].end) {
             keep = 0;
+          }
         }
         if (! keep)
           continue;
@@ -393,11 +396,11 @@ void *rp_osc_worker_thread(void *args)
       int32_t *src_data = & rp_fpga_cha_signal[tr_ptr];
       uint16_t n1 = max_data - src_data;
       uint16_t n2;
-      if (n1 >= spp) {
-        n1 = spp;
+      if (n1 >= n_samples) {
+        n1 = n_samples;
         n2 = 0;
       } else {
-        n2 = spp - n1;
+        n2 = n_samples - n1;
       }
       uint16_t i=0;
       // when tr_ptr is odd, we need to start with the higher-order word

@@ -15,6 +15,10 @@
 #ifndef __WORKER_H
 #define __WORKER_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "pulse_metadata.h"
 #include "digdar.h"
 
@@ -60,7 +64,7 @@ int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t 
 int16_t rp_osc_get_chunk_index_for_reader();
 int16_t rp_osc_get_chunk_index_for_writer();
 
-extern uint16_t spp;  // samples to grab per radar pulse
+extern uint16_t n_samples;  // samples to grab per radar pulse
 extern uint32_t decim; // decimation: 1, 2, or 8
 extern uint16_t num_pulses; // pulses to maintain in ring buffer (filled by worker thread)
 extern uint16_t chunk_size; // pulses to transmit per chunk (main thread)
@@ -77,5 +81,9 @@ extern sector removals[MAX_REMOVALS];
 extern uint16_t num_removals;
 
 extern pulse_metadata *pulse_buffer;
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* __WORKER_H*/

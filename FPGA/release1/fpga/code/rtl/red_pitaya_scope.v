@@ -180,12 +180,20 @@ always @(posedge adc_clk_i) begin
       
       if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
          adc_dec_cnt <= 17'h1                   ;
-         adc_a_sum   <= $signed(adc_a_filt_out) ;
+         if (negate) begin
+            adc_a_sum   <= {adc_a_filt_out[16-1],  ~adc_a_filt_out[15-1:0]};
+         else begin
+            adc_a_sum   <= $signed(adc_a_filt_out) ;
+         end
          adc_b_sum   <= $signed(adc_b_filt_out) ;
       end
       else begin
          adc_dec_cnt <= adc_dec_cnt + 17'h1 ;
-         adc_a_sum   <= $signed(adc_a_sum) + $signed(adc_a_filt_out) ;
+         if (negate) begin
+            adc_a_sum   <= adc_a_sum + {adc_a_filt_out[16-1],  ~adc_a_filt_out[15-1:0]};
+         else begin
+            adc_a_sum   <= $signed(adc_a_sum) + $signed(adc_a_filt_out) ;
+         end
          adc_b_sum   <= $signed(adc_b_sum) + $signed(adc_b_filt_out) ;
       end
 
@@ -332,7 +340,7 @@ always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
       // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
       // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits
-      adc_a_tmp <= {negate ? {adc_a_dat[16-1], ~adc_a_dat[15-1:0]} : adc_a_dat, adc_a_tmp[32-1:16] } ; 
+      adc_a_tmp <= {adc_a_dat, adc_a_tmp[32-1:16] } ; 
       if (adc_wp[0]) begin
          adc_a_buf[adc_wp[RSZ-1:1]] <= adc_a_tmp;
       end
