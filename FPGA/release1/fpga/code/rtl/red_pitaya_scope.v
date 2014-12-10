@@ -181,7 +181,8 @@ always @(posedge adc_clk_i) begin
       if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
          adc_dec_cnt <= 17'h1                   ;
          if (negate) begin
-            adc_a_sum   <= {adc_a_filt_out[16-1],  ~adc_a_filt_out[15-1:0]};
+            adc_a_sum   <= {16'h0, 2'h0,  adc_a_filt_out[14-1], ~adc_a_filt_out[13-1:0]};
+         end
          else begin
             adc_a_sum   <= $signed(adc_a_filt_out) ;
          end
@@ -190,7 +191,8 @@ always @(posedge adc_clk_i) begin
       else begin
          adc_dec_cnt <= adc_dec_cnt + 17'h1 ;
          if (negate) begin
-            adc_a_sum   <= adc_a_sum + {adc_a_filt_out[16-1],  ~adc_a_filt_out[15-1:0]};
+            adc_a_sum   <= adc_a_sum + {2'h0,  adc_a_filt_out[14-1], ~adc_a_filt_out[13-1:0]};
+         end
          else begin
             adc_a_sum   <= $signed(adc_a_sum) + $signed(adc_a_filt_out) ;
          end
@@ -715,11 +717,6 @@ bus_clk_bridge i_bridge
    .err_i         (  err            ),
    .ack_i         (  ack            )
 );
-
-
-
-
-
 
 endmodule
 
