@@ -201,24 +201,33 @@ int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update)
 static int16_t reader_chunk_index = -1; // which chunk is currently being read by the export thread
 static int16_t writer_chunk_index = 0;  // which chunk is currently being written by the capture thread
 
-int16_t rp_osc_get_chunk_index_for_reader() {
-  // return the index of a chunk which the reader can read from.
+int rp_osc_get_chunk_for_reader(uint16_t * cur_pulse, uint16_t * num_pulses) {
+  // return the index of the first pulse in a chunk, and the number of pulses in the chunk
   // It must already have been filled by writer.
-  int16_t rv;
+  // These values are returned in the passed pointers; the function returns
+  // 1 if successful, 0 otherwise (e.g. if there are no pulses to read.)
+  int16_t ci;
   pthread_mutex_lock(&rp_osc_ctrl_mutex);
   // try bump up to the next chunk in the ring
-  rv = (1 + reader_chunk_index) % num_chunks;
+  ci = (1 + reader_chunk_index) % num_chunks;
   // if it's the writer's chunk, we fail
-  if (rv == writer_chunk_index)
-    rv = -1;
+  if (ci == writer_chunk_index)
+    ci = -1;
   else
-    reader_chunk_index = rv;
+    reader_chunk_index = ci;
   // Note: it's possible the writer has passed us,
   // in which case it makes more sense to skip the
   // as-yet unwritten chunks, because otherwise we'll
   // be interleaving new and old ones.
   pthread_mutex_unlock(&rp_osc_ctrl_mutex);
-  return rv;
+
+  if (ci < 0)
+    return 0; // fail
+
+  *cur_pulse = ci * chunk_size;
+  *num_pulses = pulses_in_chunk[reader_chunk_index];
+
+  return 1;
 };
   
 int16_t rp_osc_get_chunk_index_for_writer() {
@@ -261,10 +270,6 @@ void *rp_osc_worker_thread(void *args)
 
     /* Continuous thread loop (exited only with 'quit' state) */
     while(1) {
-      if (n == chunk_size) {
-        cur_pulse = rp_osc_get_chunk_index_for_writer() * chunk_size;
-        n = 0;
-      }
       state = rp_osc_ctrl;
 
       /* request to stop worker thread, we will shut down */
@@ -291,7 +296,6 @@ void *rp_osc_worker_thread(void *args)
 
       if( ! osc_fpga_triggered()) {
         usleep(10);
-        sched_yield();
         continue;
       }
 
@@ -300,7 +304,6 @@ void *rp_osc_worker_thread(void *args)
       int32_t wr_ptr;
       osc_fpga_get_wr_ptr(&wr_ptr, &tr_ptr);
 
-      pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
 
       // read ARP registers
 
@@ -314,9 +317,6 @@ void *rp_osc_worker_thread(void *args)
       uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
       uint32_t arp_count = g_digdar_fpga_reg_mem->saved_arp_count;
 
-      // trig clock is relative to arp clock
-      pbm->trig_clock = trig_clock_low - arp_clock_low;
-
       // FIXME: do the ADC / RTC time pinning in the writer thread, not here,
       // so that we don't do a mode switch.
       // outgoing arp_clock_sec and arp_clock_nsec fields are set using a time pin:
@@ -325,6 +325,9 @@ void *rp_osc_worker_thread(void *args)
       // we only check the low order 32-bits of clock, because there's no
       // way it could have wrapped the full 32-bit range between two heading pulses 
       // (that would be ~32 seconds)
+
+      unsigned char need_new_chunk = 0;
+
       if (arp_clock_low != prev_arp_clock_low) {
         // we're onto a new ARP, so back-calculate what the RTC would have been
         // given that the current rtc corresponds to the current pulse, which
@@ -341,7 +344,26 @@ void *rp_osc_worker_thread(void *args)
           rtc.tv_nsec += 1000000000;
         }
         prev_arp_clock_low = arp_clock_low;
+        need_new_chunk = 1;
       }
+
+      if (n == chunk_size || need_new_chunk) {
+        // a new chunk is begun each time the count of pulses digitized has reached
+        // the chunk size, or when the ARP has increased.  This aligns chunks so
+        // that the reader thread can grab an entire sweep at a time, in situations
+        // such as retention of only a sector of the image, where it is beneficial
+        // to write out pulse data to clients during the dead portion of the sweep.
+        
+        pulses_in_chunk[writer_chunk_index] = n;
+        n = 0;
+        cur_pulse = rp_osc_get_chunk_index_for_writer() * chunk_size;
+      }
+
+      pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse * psize);
+
+      // trig clock is relative to arp clock
+      pbm->trig_clock = trig_clock_low - arp_clock_low;
+
       // this is a bit dumb; we're recording the high-res ARP timestamp with
       // each digitized pulse, even though it only changes once per sweep.
 

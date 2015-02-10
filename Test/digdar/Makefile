@@ -26,11 +26,11 @@ SRCS = $(subst .o,.c, $(OBJS)))
 TARGET=digdar
 
 # GCC compiling & linking flags
-##CFLAGS=-g3 -std=gnu99 -Wall -Werror
+#CFLAGS=-g3 -std=gnu99 -Wall -Werror
 CFLAGS=-O2 -std=gnu99 -Wall -Werror
 CFLAGS += -DVERSION=$(VERSION) -DREVISION=$(REVISION)
 CPPOPTS=-std=c++11  -fPIC -O2
-##CPPOPTS=-g3 -std=c++11  -fPIC 
+#CPPOPTS=-g3 -std=c++11  -fPIC 
 
 # Red Pitaya common SW directory
 SHARED=../../shared/
