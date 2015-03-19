@@ -13,7 +13,19 @@
  * for more details on the language used herein.
  */
 
+/*
+ FIXME: does this version have two invalid samples at start of each pulse?
+ If so, then the counting logic is broken and we're writing one pair fewer
+ of samples to the buffer than we should be, but we're also starting
+ one pair of samples too early and this line (326):
+ 
+          adc_wp_trig <= adc_wp - 1'b1 ; // save write pointer at trigger arrival
 
+ should be replaced with:
+
+          adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
+ */
+ 
 
 /**
  * GENERAL DESCRIPTION:
@@ -288,7 +300,7 @@ assign use_sum = digdar_extra_options[4] & (set_dec <= 4); // when decimation is
 // Write
 always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
-      adc_wp      <= {RSZ{1'b0}};
+      adc_wp      <= {RSZ{1'b1}}; // point to -1st entry, as we increment this pointer before the first post-trigger write.
       adc_we      <=  1'b0      ;
       adc_wp_trig <= {RSZ{1'b0}};
       adc_wp_cur  <= {RSZ{1'b0}};
@@ -304,14 +316,14 @@ always @(posedge adc_clk_i) begin
 
 
       if (adc_rst_do)
-         adc_wp <= {RSZ{1'b0}};
+         adc_wp <= {RSZ{1'b1}};
       else if (adc_we && adc_dv)
          adc_wp <= adc_wp + 1'b1 ;
 
       if (adc_rst_do)
          adc_wp_trig <= {RSZ{1'b0}};
       else if (adc_trig && !adc_dly_do)
-         adc_wp_trig <= adc_wp_cur ; // save write pointer at trigger arrival
+         adc_wp_trig <= adc_wp - 1'b1 ; // save write pointer at trigger arrival
 
       if (adc_rst_do)
          adc_wp_cur <= {RSZ{1'b0}};
