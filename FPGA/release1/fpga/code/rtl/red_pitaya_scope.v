@@ -323,7 +323,7 @@ always @(posedge adc_clk_i) begin
       if (adc_rst_do)
          adc_wp_trig <= {RSZ{1'b0}};
       else if (adc_trig && !adc_dly_do)
-         adc_wp_trig <= adc_wp - 1'b1 ; // save write pointer at trigger arrival
+         adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
 
       if (adc_rst_do)
          adc_wp_cur <= {RSZ{1'b0}};
@@ -345,7 +345,7 @@ always @(posedge adc_clk_i) begin
       if (adc_dly_do && adc_we && adc_dv)
          adc_dly_cnt <= adc_dly_cnt + {32{1'b1}} ; // -1
       else if (!adc_dly_do)
-         adc_dly_cnt <= set_dly ;
+         adc_dly_cnt <= set_dly + set_dec; // add decimation count to preserve write-enable for the extra cycles required to store the final word
 
    end
 end
