@@ -418,7 +418,7 @@ int main(int argc, char *argv[])
         if (m < 0)
           break;
         n -= m;
-        offset += n;
+        offset += m;
       } while (n > 0);
       if (m < 0)
         break;
