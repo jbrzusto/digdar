@@ -31,8 +31,8 @@ Here's how we currently handle the signals on the RP (all pins have DC input-cou
  ---|---|---|---|---
  VID|30 MHz or higher|ADC0, 14 bit, 125 MSPS|-1 to +1 V; 1 MΩ 10pF|-0.5 to +3V; 50 or 75 Ω
  TRG|30 MHz or higher|ADC0, 14 bit, 125 MSPS|-13 to +13 V; 1 MΩ 10pF|0 to +12V; unknown Ω
- ACP|5 kHz or higher|AUXADCA, 12 bit, 25 KSPS|0 to 3.5 V; low II|0 to +12V; unknown Ω
- ARP|5 kHz or higher|AUXADCB, 12 bit, 25 KSPS|0 to 3.5 V; low II|0 to +12V; unknown Ω
+ ACP|5 kHz or higher|AUXADCA, 12 bit, 25 KSPS|0 to 3.5 V; unknown Ω|0 to +12V; unknown Ω
+ ARP|5 kHz or higher|AUXADCB, 12 bit, 25 KSPS|0 to 3.5 V; unknown Ω|0 to +12V; unknown Ω
 
 ## Current RP Front End ##
 
