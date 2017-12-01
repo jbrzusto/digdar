@@ -38,7 +38,8 @@ Here's how we currently handle the signals on the RP (all pins have DC input-cou
 
 VID and TRG have a 50 Ω termination added to match cabling and SMA connectors.
 All 4 signals are fed through custom, simple discrete-component resistor networks to
-match voltage ranges and impedances.   We want to replace all of this with
+match voltage ranges and impedances.   We want to replace all of this analog
+circuitry with a stand-alone black box.
 
 ## Desired Front End ##
 
