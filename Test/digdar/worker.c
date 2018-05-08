@@ -32,28 +32,28 @@
  * GENERAL DESCRIPTION:
  *
  * The worker module is linking point between main digdar module and FPGA
- * module. 
+ * module.
  *
  * It is running continuously in separate thread and controls FPGA OSC module. If
- * the oscilloscope is running in auto or manual mode it collects results, 
- * process them and put them to main module, where they are available for the 
- * client. In the opposite direction main module is setting new parameters which 
- * are used by worker by each new iteration of the worker thread loop. If 
- * parameters change during measurement, this is aborted and worker updates new 
+ * the oscilloscope is running in auto or manual mode it collects results,
+ * process them and put them to main module, where they are available for the
+ * client. In the opposite direction main module is setting new parameters which
+ * are used by worker by each new iteration of the worker thread loop. If
+ * parameters change during measurement, this is aborted and worker updates new
  * parameters and starts new measurement.
  * Third party of the data is control of the worker thread loop - main or worker
  * module can change the state of the loop. Possible states are defined in
  * rp_osc_worker_state_e enumeration.
  *
  * Signal and parameters structures between worker and main module are protected
- * with mutexes - which means only one can access them at the same time. With 
+ * with mutexes - which means only one can access them at the same time. With
  * this the consistency of output (signal) or input (parameters) data is assured.
- * 
- * Besides interfacing main and FPGA module big task of worker module is also 
+ *
+ * Besides interfacing main and FPGA module big task of worker module is also
  * processing the result, this includes:
  *  - preparing time vector, based on current settings
  *  - decimating the signal length from FPGA buffer length (OSC_FPGA_SIG_LEN) to
- *    output signal length (SIGNAL_LENGTH defined in main_osc.h). 
+ *    output signal length (SIGNAL_LENGTH defined in main_osc.h).
  *  - converting signal from ADC samples to voltage in [V].
  */
 
@@ -77,10 +77,10 @@ int                   rp_osc_params_fpga_update;
 pthread_mutex_t       rp_osc_sig_mutex = PTHREAD_MUTEX_INITIALIZER;
 /** Output signals holder */
 float               **rp_osc_signals;
-/** Output signals signalizer - it indicates to main whether new signals are 
+/** Output signals signalizer - it indicates to main whether new signals are
  *  available or not */
 int                   rp_osc_signals_dirty = 0;
-/** Output signal index indicator - used in long acquisitions, it indicates 
+/** Output signal index indicator - used in long acquisitions, it indicates
  *  to main module if the returning signal is full or partial
  */
 int                   rp_osc_sig_last_idx = 0;
@@ -93,7 +93,7 @@ int                  *rp_fpga_xcha_signal, *rp_fpga_xchb_signal;
 
 /** @brief Initializes worker module
  *
- * This function starts new worker thread, initializes internal structures 
+ * This function starts new worker thread, initializes internal structures
  * (signals, state, ...) and initializes FPGA module.
  *
  * @retval -1 Failure
@@ -116,12 +116,12 @@ int rp_osc_worker_init(void)
     osc_fpga_get_sig_ptr(&rp_fpga_cha_signal, &rp_fpga_chb_signal, &rp_fpga_xcha_signal, &rp_fpga_xchb_signal);
 
     /* Creating worker thread */
-    ret_val = 
+    ret_val =
         pthread_create(&rp_osc_thread_handler, NULL, rp_osc_worker_thread, NULL);
     if(ret_val != 0) {
         osc_fpga_exit();
 
-        fprintf(stderr, "pthread_create() failed: %s\n", 
+        fprintf(stderr, "pthread_create() failed: %s\n",
                 strerror(errno));
         return -1;
     }
@@ -132,7 +132,7 @@ int rp_osc_worker_init(void)
 /** @brief Cleans up worker module.
  *
  * This function stops the working thread (sending quit state to it) and waits
- * until it is shutdown. After that it cleans up FPGA module and internal 
+ * until it is shutdown. After that it cleans up FPGA module and internal
  * structures.
  * After this function is called any access to worker module are forbidden.
  *
@@ -145,7 +145,7 @@ int rp_osc_worker_exit(void)
     rp_osc_worker_change_state(rp_osc_quit_state);
     ret_val = pthread_join(rp_osc_thread_handler, NULL);
     if(ret_val != 0) {
-        fprintf(stderr, "pthread_join() failed: %s\n", 
+        fprintf(stderr, "pthread_join() failed: %s\n",
                 strerror(errno));
     }
 
@@ -176,12 +176,12 @@ int rp_osc_worker_change_state(rp_osc_worker_state_t new_state)
     return 0;
 }
 
-/** @brief Updates the worker copy of the parameters 
+/** @brief Updates the worker copy of the parameters
  *
  * This function is used to update the parameters in worker. These parameters are
- * not effective immediately. They will be used by worker thread loop after 
+ * not effective immediately. They will be used by worker thread loop after
  * current operation is finished.
- * 
+ *
  * @param [in] params New parameters
  * @param [in] fpga_update Flag is FPGA needs to be updated.
  *
@@ -229,7 +229,7 @@ int rp_osc_get_chunk_for_reader(uint16_t * cur_pulse, uint16_t * num_pulses) {
 
   return 1;
 };
-  
+
 int16_t rp_osc_get_chunk_index_for_writer() {
   // return the index of a chunk which the writer can write to.
   // Normally, it's the next chunk in the ring, except that
@@ -323,7 +323,7 @@ void *rp_osc_worker_thread(void *args)
       // whenever we notice a change in arp clock ticks, we grab the system time.
 
       // we only check the low order 32-bits of clock, because there's no
-      // way it could have wrapped the full 32-bit range between two heading pulses 
+      // way it could have wrapped the full 32-bit range between two heading pulses
       // (that would be ~32 seconds)
 
       unsigned char need_new_chunk = 0;
@@ -353,7 +353,7 @@ void *rp_osc_worker_thread(void *args)
         // that the reader thread can grab an entire sweep at a time, in situations
         // such as retention of only a sector of the image, where it is beneficial
         // to write out pulse data to clients during the dead portion of the sweep.
-        
+
         pulses_in_chunk[writer_chunk_index] = n;
         n = 0;
         cur_pulse = rp_osc_get_chunk_index_for_writer() * chunk_size;
@@ -386,15 +386,15 @@ void *rp_osc_worker_thread(void *args)
 
       pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
 
-      pbm->num_trig = trig_count; 
+      pbm->num_trig = trig_count;
 
-      pbm->num_arp = arp_count; 
+      pbm->num_arp = arp_count;
 
       // arm to allow acquisition of next pulse while we copy data from the BRAM buffer
       // for this one.
 
       osc_fpga_arm_trigger();
-        
+
       /* Start the trigger: 10 is the digdar trigger source on TRIG line; FIXME: find the .H file where this is defined */
       osc_fpga_set_trigger(10);
 
@@ -429,23 +429,23 @@ void *rp_osc_worker_thread(void *args)
       uint32_t tmp;
       if (tr_ptr & 1) {
         tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-        data[0] = tmp >> 16;
+        data[0] = 0x11fff - (tmp >> 16);
         ++i;
       }
       for (/**/ ; i < n1; ++i) {
         tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-        data[i] = tmp & 0xffff;
+        data[i] = 0x11fff -  (tmp & 0xffff);
         if (++i < n1)
-          data[i] = tmp >> 16;
+          data[i] = 0x11fff - (tmp >> 16);
       }
       if (n2) {
         src_data = & rp_fpga_cha_signal[0];
         data = &data[i];
         for (i = 0; i < n2; ++i) {
           tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-          data[i] = tmp & 0xffff;
+          data[i] = 0x11fff - (tmp & 0xffff);
           if (++i < n2)
-            data[i] = tmp >> 16;
+            data[i] = 0x11fff - (tmp >> 16);
         }
       }
       ++cur_pulse;
@@ -453,5 +453,3 @@ void *rp_osc_worker_thread(void *args)
     }
     return 0;
 }
-
-
