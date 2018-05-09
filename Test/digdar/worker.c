@@ -311,9 +311,7 @@ void *rp_osc_worker_thread(void *args)
       uint32_t arp_clock_low = g_digdar_fpga_reg_mem->saved_arp_clock_low;
       uint32_t trig_clock_low = g_digdar_fpga_reg_mem->saved_trig_clock_low;
       uint32_t acp_clock_low = g_digdar_fpga_reg_mem->saved_acp_clock_low;
-      uint32_t acp_period = acp_clock_low - g_digdar_fpga_reg_mem->saved_acp_prev_clock_low;
       uint32_t acp_at_arp = g_digdar_fpga_reg_mem->saved_acp_at_arp;
-      uint32_t acp_per_arp = g_digdar_fpga_reg_mem->saved_acp_per_arp;
       uint32_t acp_count = g_digdar_fpga_reg_mem->saved_acp_count;
       uint32_t arp_count = g_digdar_fpga_reg_mem->saved_arp_count;
 
@@ -370,21 +368,20 @@ void *rp_osc_worker_thread(void *args)
       pbm->arp_clock_sec = rtc.tv_sec;
       pbm->arp_clock_nsec = rtc.tv_nsec;
 
-      // acp clock is in [0..1] representing best estimate of the portion of sweep completed
-      // since the most recent arp
-      // That is, the number of ACPs / the number of ACPs per sweep, plus a bit of extra
-      // based on how long since the last ACP compared to the most recent ACP period
+      // acp clock is N + M, where N is the number of ACPs since the latest ARP,
+      // and M is the fraction of 8 ms represented by the time since the latest ACP
+      // i.e. M = elapsed ADC clock ticks / 1E6
+      // it is up to the client to convert this to a true azimuth clock in 0..1,
+      // based upon knowning how many ACPs there are per sweep.
+      // The only assumption here is that ACPs are spaced no further than 8 ms
+      // apart.   With the Furuno having 450 ACPs per sweep, even at the very slow
+      // 20 rpm, ACPs are 6.67 ms apart.
 
-      pbm->acp_clock = acp_count - acp_at_arp; // # of whole ACPs since ARP
-      if (acp_period > 0) {
-        float partial = (trig_clock_low - acp_clock_low) / (float) acp_period;  // time since ACP scaled by ACP period = fractional ACPs
-        // FIXME: sometimes partial is much larger than 1.0 - this is clearly incorrect, but
-        // why does it happen?  For now, use a basic sanity check.
-        if (partial > 0.0 && partial < 1.0)
-          pbm->acp_clock += partial;
-      }
-
-      pbm->acp_clock /= acp_per_arp > 0 ? acp_per_arp : 4096;
+      pbm->acp_clock = acp_count - acp_at_arp;
+      float extra = (uint32_t) (trig_clock_low - acp_clock_low) / 1.0e6;
+      if (extra >= 0.999)
+        extra = 0.999;
+      pbm->acp_clock += extra;
 
       pbm->num_trig = trig_count;
 
