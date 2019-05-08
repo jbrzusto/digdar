@@ -78,6 +78,7 @@ void usage() {
     "\n"
     "Usage: %s [OPTION]\n"
     "\n"
+    "  --acps -a NACP Number of ACPs per sweep; default: 450, which is appropriate for a Furuno FR radar\n"
     "  --dbfile -b FILENAME  Database filename; capture to this sqlite database instead of writing to stdout or TCP\n"
     "  --decim  -d DECIM   Decimation rate: one of 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n"
     "  --dump_params -D  don't run - just dump current FPGA parameter values as NAME VAL\n"
@@ -190,6 +191,7 @@ uint16_t num_chunks = 0; // maximum number of pulses per chunk
 uint16_t *pulses_in_chunk = 0; // number of pulses actually in each chunk
 uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
 uint16_t use_sum = 0; // if non-zero, return sum of samples rather than truncated average
+uint16_t acps = 450; // number of ACPs per sweep; used in calculating removal
 int outfd = -1; // file descriptor for output; fileno(stdout) by default;
 capture_db * cap = 0; // pointer to capture database structure, if capturing to sqlite
 
@@ -226,6 +228,7 @@ int main(int argc, char *argv[])
   /* Command line options */
   static struct option long_options[] = {
     /* These options set a flag. */
+    {"acps", required_argument, 0, 'a'},
     {"dbfile", required_argument, 0, 'b'},
     {"decim", required_argument,       0, 'd'},
     {"dump", no_argument, 0, 'D'},
@@ -297,8 +300,8 @@ int main(int argc, char *argv[])
           exit (EXIT_FAILURE );
         }
         *split = '\0';
-        removals[num_removals].begin = atof(optarg);
-        removals[num_removals].end = atof(split + 1);
+        removals[num_removals].begin = atof(optarg) * acps;
+        removals[num_removals].end = atof(split + 1) * acps;
         ++num_removals;
       };
       break;
