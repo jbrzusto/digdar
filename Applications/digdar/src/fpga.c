@@ -4,7 +4,7 @@
  * @brief Red Pitaya Oscilloscope FPGA Interface.
  *
  * @Author Jure Menart <juremenart@gmail.com>
- *         
+ *
  * (c) Red Pitaya  http://www.redpitaya.com
  *
  * This part of code is written in C programming language.
@@ -145,13 +145,13 @@ int osc_fpga_init(void)
         return -1;
     }
     g_osc_fpga_reg_mem = page_ptr + page_off;
-    g_osc_fpga_cha_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_cha_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_CHA_OFFSET / sizeof(uint32_t));
-    g_osc_fpga_chb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_chb_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_CHB_OFFSET / sizeof(uint32_t));
-    g_osc_fpga_xcha_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_xcha_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_XCHA_OFFSET / sizeof(uint32_t));
-    g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_XCHB_OFFSET / sizeof(uint32_t));
 
     page_addr = DIGDAR_FPGA_BASE_ADDR & (~(page_size-1));
@@ -218,13 +218,13 @@ int osc_fpga_exit(void)
  * @param[in] arp_excite         digdar arp excitation threshold; unit: relative to ADC full range; [-1 ... 1]
  * @param[in] arp_relax          digdar arp relaxation threshold; unit: relative to ADC full range; [-1 ... 1]
  * @param[in] arp_latency        digdar arp latency: min delay between relaxation and excitation; unit: ADC clocks
- * @param[in] acps_per_arp       digdar number of acps per arp 
+ * @param[in] acps_per_arp       digdar number of acps per arp
  *
  * @retval  0 Success
  * @retval -1 Failure, error message is output on standard error device
  */
 
-int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
+int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
                            float trig_delay, float trig_level, int time_range,
                            float ch1_adc_max_v, float ch2_adc_max_v,
                            int ch1_calib_dc_off, float ch1_user_dc_off,
@@ -240,33 +240,33 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
 
 {
     /* TODO: Locking of memory map */
-    int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source, 
+    int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source,
                                                     trig_edge);
     int fpga_dec_factor = osc_fpga_cnv_time_range_to_dec(time_range);
     int fpga_delay;
     float after_trigger; /* how much after trigger FPGA should write */
     int fpga_trig_thr;
-    
+
     uint32_t gain_hi_cha_filt_aa=0x7D93;
     uint32_t gain_hi_cha_filt_bb=0x437C7;
     uint32_t gain_hi_cha_filt_pp=0x2666;
     uint32_t gain_hi_cha_filt_kk=0xd9999a;
-    
+
     uint32_t gain_hi_chb_filt_aa=0x7D93;
     uint32_t gain_hi_chb_filt_bb=0x437C7;
     uint32_t gain_hi_chb_filt_pp=0x2666;
     uint32_t gain_hi_chb_filt_kk=0xd9999a;
-    
+
     uint32_t gain_lo_cha_filt_aa=0x4C5F;
     uint32_t gain_lo_cha_filt_bb=0x2F38B;
     uint32_t gain_lo_cha_filt_pp=0x2666;
     uint32_t gain_lo_cha_filt_kk=0xd9999a;
-    
+
     uint32_t gain_lo_chb_filt_aa=0x4C5F;
     uint32_t gain_lo_chb_filt_bb=0x2F38B;
     uint32_t gain_lo_chb_filt_pp=0x2666;
-    uint32_t gain_lo_chb_filt_kk=0xd9999a;    
-    
+    uint32_t gain_lo_chb_filt_kk=0xd9999a;
+
     if(trig_source == 0) {
         fpga_trig_thr = osc_fpga_cnv_v_to_cnt(trig_level, ch1_adc_max_v,
                                               ch1_calib_dc_off, ch1_user_dc_off);
@@ -285,7 +285,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
     /* Pre-trigger - we need to limit after trigger acquisition so we can
      * readout historic (pre-trigger) values */
     /* TODO: Bug in FPGA? We need to put at least 3 less samples to trig_delay */
-    after_trigger = 
+    after_trigger =
         ((OSC_FPGA_SIG_LEN-7) * c_osc_fpga_smpl_period * fpga_dec_factor) +
         trig_delay;
 
@@ -296,7 +296,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
 
     /* Trig source is written after ARM */
     /*    g_osc_fpga_reg_mem->trig_source   = fpga_trig_source;*/
-    if(trig_source == 0) 
+    if(trig_source == 0)
         g_osc_fpga_reg_mem->cha_thr   = fpga_trig_thr;
     else
         g_osc_fpga_reg_mem->chb_thr   = fpga_trig_thr;
@@ -304,15 +304,15 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
     g_osc_fpga_reg_mem->trigger_delay = (uint32_t)fpga_delay;
 
     g_osc_fpga_reg_mem->other = enable_avg_at_dec;
-    
-    
+
+
     // Updating hysteresys registers
-    
-    
+
+
     g_osc_fpga_reg_mem->cha_hystersis=OSC_HYSTERESIS;
     g_osc_fpga_reg_mem->chb_hystersis=OSC_HYSTERESIS;
-    
-    
+
+
     // Updating equalization filter with default coefficients
     if (ch1_gain==0)
     {
@@ -326,9 +326,9 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
      g_osc_fpga_reg_mem->cha_filt_aa =gain_lo_cha_filt_aa;
      g_osc_fpga_reg_mem->cha_filt_bb =gain_lo_cha_filt_bb;
      g_osc_fpga_reg_mem->cha_filt_pp =gain_lo_cha_filt_pp;
-     g_osc_fpga_reg_mem->cha_filt_kk =gain_lo_cha_filt_kk;      
+     g_osc_fpga_reg_mem->cha_filt_kk =gain_lo_cha_filt_kk;
     }
-    
+
        if (ch2_gain==0)
     {
      g_osc_fpga_reg_mem->chb_filt_aa =gain_hi_chb_filt_aa;
@@ -341,11 +341,11 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
      g_osc_fpga_reg_mem->chb_filt_aa =gain_lo_chb_filt_aa;
      g_osc_fpga_reg_mem->chb_filt_bb =gain_lo_chb_filt_bb;
      g_osc_fpga_reg_mem->chb_filt_pp =gain_lo_chb_filt_pp;
-     g_osc_fpga_reg_mem->chb_filt_kk =gain_lo_chb_filt_kk;      
+     g_osc_fpga_reg_mem->chb_filt_kk =gain_lo_chb_filt_kk;
     }
-    
+
        // Update digdar registers
-       
+
        g_digdar_fpga_reg_mem->trig_thresh_excite = trig_excite * (1 << (c_osc_fpga_adc_bits - 1));
        g_digdar_fpga_reg_mem->trig_thresh_relax  = trig_relax  * (1 << (c_osc_fpga_adc_bits - 1));
        g_digdar_fpga_reg_mem->trig_delay   = digdar_trig_delay;
@@ -354,7 +354,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
        g_digdar_fpga_reg_mem->acp_thresh_excite = acp_excite * (1 << (c_osc_fpga_xadc_bits - 1));
        g_digdar_fpga_reg_mem->acp_thresh_relax  = acp_relax  * (1 << (c_osc_fpga_xadc_bits - 1));
        g_digdar_fpga_reg_mem->acp_latency       = acp_latency;
-       
+
        g_digdar_fpga_reg_mem->arp_thresh_excite = arp_excite * (1 << (c_osc_fpga_xadc_bits - 1));
        g_digdar_fpga_reg_mem->arp_thresh_relax  = arp_relax  * (1 << (c_osc_fpga_xadc_bits - 1));
        g_digdar_fpga_reg_mem->arp_latency       = arp_latency;
@@ -386,7 +386,20 @@ int osc_fpga_reset(void)
 int osc_fpga_arm_trigger(void)
 {
     g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
-
+    /** @brief Extra options:
+     * bit [0] - if 1, only record samples after trigger detected
+     *            this serves to protect a digitized pulse, so that
+     *            we can be reading it from BRAM into DRAM while the FPGA
+     *            waits for and digitizes another pulse. (Provided the number
+     *            of samples to be digitized is <= 1/2 the buffer size of 16 k samples)
+     * bit [1] - if 1, ADC A negates values and returns in 2s complement; otherwise,
+     *           values are returned as-is.
+     * bit [2] - use 32-bit reads from buffers
+     * bit [3] - use counting mode, not real ADC samples; for debugging only
+     * bit [4] - return sample sum, not average, for decimation rates <= 4 (returns as 16-bit)
+     * bits [31:2] - reserved
+     */
+    g_osc_fpga_reg_mem->digdar_extra_options = (1 << 0) | (1 << 4);
     return 0;
 }
 
@@ -505,7 +518,7 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
 {
     int fpga_trig_source = 0;
 
-    /* Trigger immediately */    
+    /* Trigger immediately */
     if(trig_imm)
         return 1;
 
@@ -641,7 +654,7 @@ int osc_fpga_cnv_v_to_cnt(float voltage, float adc_max_v,
     voltage -= user_dc_off;
 
     /* map voltage units into FPGA adc counts */
-    adc_cnts = (int)round(voltage * (float)((int)(1<<c_osc_fpga_adc_bits)) / 
+    adc_cnts = (int)round(voltage * (float)((int)(1<<c_osc_fpga_adc_bits)) /
                           (2*adc_max_v));
 
     /* clip to the highest value (we are dealing with 14 bits only) */
@@ -697,7 +710,7 @@ float osc_fpga_cnv_cnt_to_v(int cnts, float adc_max_v,
     else if(m > (1<<(c_osc_fpga_adc_bits-1)))
         m =  (1<<(c_osc_fpga_adc_bits-1));
 
-    ret_val =  (m * adc_max_v / 
+    ret_val =  (m * adc_max_v /
                 (float)(1<<(c_osc_fpga_adc_bits-1)));
 
     /* and adopt the calculation with user specified DC offset */
@@ -709,19 +722,18 @@ float osc_fpga_cnv_cnt_to_v(int cnts, float adc_max_v,
 /** @brief Converts Slow ADC counts to voltage
  *
  * This function converts Slow ADC counts to voltage (in [V])
- * 
+ *
  * @param [in] cnts Slow ADC counts
- * 
+ *
  * @retval voltage Voltage in [V]
  */
 float osc_fpga_cnv_xcnt_to_v(int cnts)
 {
     int m;
     cnts &= (1 << c_osc_fpga_xadc_bits) - 1;
-
     if(cnts & (1<<(c_osc_fpga_xadc_bits-1))) {
         /* negative number */
-        m = -1 *((cnts ^ ((1<<c_osc_fpga_xadc_bits)-1)) + 1);
+      m = -1 *((cnts ^ ((1<<c_osc_fpga_xadc_bits)-1)) + 1);
     } else {
         m = cnts;
         /* positive number */
@@ -732,9 +744,9 @@ float osc_fpga_cnv_xcnt_to_v(int cnts)
 /** @brief Convert ADC counts to relative range (-1..1)
  *
  * This function converts ADC counts to the relative range -1..1
- * 
+ *
  * @param [in] cnts ADC counts
- * 
+ *
  * @retval relative range in [-1..1]
  */
 float osc_fpga_cnv_cnt_to_rel(int cnts, int bits)
@@ -770,9 +782,8 @@ float osc_fpga_calc_adc_max_v(uint32_t fe_gain_fs, int probe_att)
     float max_adc_v;
     int probe_att_fact = (probe_att > 0) ? 10 : 1;
 
-    max_adc_v = 
+    max_adc_v =
         fe_gain_fs/(float)((uint64_t)1<<32) * 100 * (probe_att_fact);
 
     return max_adc_v;
 }
-
