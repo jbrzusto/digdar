@@ -678,6 +678,7 @@ float osc_fpga_cnv_cnt_to_v(int cnts, float adc_max_v,
     int m;
     float ret_val;
 
+    cnts &= (1 << c_osc_fpga_adc_bits) - 1;
     /* check sign */
     if(cnts & (1<<(c_osc_fpga_adc_bits-1))) {
         /* negative number */
@@ -716,6 +717,7 @@ float osc_fpga_cnv_cnt_to_v(int cnts, float adc_max_v,
 float osc_fpga_cnv_xcnt_to_v(int cnts)
 {
     int m;
+    cnts &= (1 << c_osc_fpga_xadc_bits) - 1;
 
     if(cnts & (1<<(c_osc_fpga_xadc_bits-1))) {
         /* negative number */
@@ -740,6 +742,7 @@ float osc_fpga_cnv_cnt_to_rel(int cnts, int bits)
     int m;
     float scale = 1.0 / (1 << (bits - 1));
 
+    cnts &= (1 << bits) - 1;
     if(cnts & (1<<(bits-1))) {
         /* negative number */
         m = -1 *((cnts ^ ((1<<bits)-1)) + 1);
