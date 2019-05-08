@@ -26,6 +26,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <map>
+#include <iostream>
+#include <fstream>
 
 #include "digdar.h"
 #include "main_digdar.h"
@@ -77,11 +80,13 @@ void usage() {
     "\n"
     "  --dbfile -b FILENAME  Database filename; capture to this sqlite database instead of writing to stdout or TCP\n"
     "  --decim  -d DECIM   Decimation rate: one of 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n"
+    "  --dump_params -D  don't run - just dump current FPGA parameter values as NAME VAL\n"
     "  --sum   If specified, return the sum (in 16-bits) of samples in the decimation period.\n"
     "          e.g. instead of returning (x[0]+x[1])/2 at decimation rate 2, return x[0]+x[1]\n"
     "          Only valid if the decimation rate is <= 4 so that the sum fits in 16 bits\n"
     "  --samples   -n SAMPLES   Samples per pulse. (Up to 16384; default is 3000)\n"
     "  --pulses -p PULSES Number of pulses to allocate buffer for (default, 1000)\n"
+    "  --param_file -P FILE File of name value pairs for digitizer fpga parameters\n"
     "  --remove -r START:END  Remove sector.  START and END are portions of the circle in [0, 1]\n"
     "                         where 0 is the start of the ARP pulse, and 1 is the start of the next ARP\n"
     "                         pulse.  Pulses within the sector from START to END are remoted and not output.\n"
@@ -103,6 +108,76 @@ double now() {
   return ts.tv_sec + ts.tv_nsec / 1.0e9;
 };
 
+
+
+std::map<std::string, int> name_map;
+
+void set_param (std::string name, uint32_t value) {
+  // set the FPGA parameter given by name to the specified value
+  // All settable FPGA register values are 32 bits.
+  * (uint32_t *) (((char *) g_digdar_fpga_reg_mem) + 4 * name_map[name]) = value;
+};
+
+uint32_t get_param (std::string name) {
+  return * (uint32_t *) (((char *) g_digdar_fpga_reg_mem) + 4 * name_map[name]);
+};
+
+void setup_param_name_map() {
+  // names must be in the same order as they are in the definition
+  // of digdar_fpga_reg_mem_t
+  // Not all of these make sense to set!
+  int i = 0;
+  name_map["trig_thresh_excite"]         = i++;
+  name_map["trig_thresh_relax"]          = i++;
+  name_map["trig_delay"]                 = i++;
+  name_map["trig_latency"]               = i++;
+  name_map["trig_count"]                 = i++;
+  name_map["trig_clock_low"]             = i++;
+  name_map["trig_clock_high"]            = i++;
+  name_map["trig_prev_clock_low"]        = i++;
+  name_map["trig_prev_clock_high"]       = i++;
+  name_map["acp_thresh_excite"]          = i++;
+  name_map["acp_thresh_relax"]           = i++;
+  name_map["acp_latency"]                = i++;
+  name_map["acp_count"]                  = i++;
+  name_map["acp_clock_low"]              = i++;
+  name_map["acp_clock_high"]             = i++;
+  name_map["acp_prev_clock_low"]         = i++;
+  name_map["acp_prev_clock_high"]        = i++;
+  name_map["arp_thresh_excite"]          = i++;
+  name_map["arp_thresh_relax"]           = i++;
+  name_map["arp_latency"]                = i++;
+  name_map["arp_count"]                  = i++;
+  name_map["arp_clock_low"]              = i++;
+  name_map["arp_clock_high"]             = i++;
+  name_map["arp_prev_clock_low"]         = i++;
+  name_map["arp_prev_clock_high"]        = i++;
+  name_map["acp_per_arp"]                = i++;
+  name_map["saved_trig_count"]           = i++;
+  name_map["saved_trig_clock_low"]       = i++;
+  name_map["saved_trig_clock_high"]      = i++;
+  name_map["saved_trig_prev_clock_low"]  = i++;
+  name_map["saved_trig_prev_clock_high"] = i++;
+  name_map["saved_acp_count"]            = i++;
+  name_map["saved_acp_clock_low"]        = i++;
+  name_map["saved_acp_clock_high"]       = i++;
+  name_map["saved_acp_prev_clock_low"]   = i++;
+  name_map["saved_acp_prev_clock_high"]  = i++;
+  name_map["saved_arp_count"]            = i++;
+  name_map["saved_arp_clock_low"]        = i++;
+  name_map["saved_arp_clock_high"]       = i++;
+  name_map["saved_arp_prev_clock_low"]   = i++;
+  name_map["saved_arp_prev_clock_high"]  = i++;
+  name_map["saved_acp_per_arp"]          = i++;
+  name_map["clocks_low"]                 = i++;
+  name_map["clocks_high"]                = i++;
+  name_map["acp_raw"]                    = i++;
+  name_map["arp_raw"]                    = i++;
+  name_map["acp_at_arp"]                 = i++;
+  name_map["saved_acp_at_arp"]           = i++;
+  name_map["trig_at_arp"]                = i++;
+  name_map["saved_trig_at_arp"]          = i++;
+};
 
 sector removals[MAX_REMOVALS];
 uint16_t num_removals = 0;
@@ -133,6 +208,9 @@ char * host = 0;
 char * port = 0;
 char * dbfile = 0;
 
+bool dump_params = false; // if true, just dump all digdar FPGA registers as NAME VALUE
+std::string param_file; // if specified, read parameters from this file and set FPGA regs appropriately
+
 /** Acquire pulses main */
 int main(int argc, char *argv[])
 {
@@ -143,14 +221,18 @@ int main(int argc, char *argv[])
     exit ( EXIT_FAILURE );
   }
 
+  setup_param_name_map();
+
   /* Command line options */
   static struct option long_options[] = {
     /* These options set a flag. */
     {"dbfile", required_argument, 0, 'b'},
     {"decim", required_argument,       0, 'd'},
+    {"dump", no_argument, 0, 'D'},
     {"samples",      required_argument,       0, 'n'},
     {"sum",      no_argument,       0, 's'},
     {"pulses",       required_argument,       0, 'p'},
+    {"param_file",   required_argument,       0, 'P'},
     {"chunk_size",    required_argument,          0, 'c'},
     {"remove",    required_argument,          0, 'r'},
     {"tcp",    required_argument,          0, 't'},
@@ -158,7 +240,7 @@ int main(int argc, char *argv[])
     {"help",         no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
-  const char *optstring = "b:c:d:hn:p:r:st:v";
+  const char *optstring = "ab:c:d:Dhn:p:P:r:st:v";
 
   /* getopt_long stores the option index here. */
   int option_index = 0;
@@ -166,6 +248,10 @@ int main(int argc, char *argv[])
   int ch = -1;
   while ( (ch = getopt_long( argc, argv, optstring, long_options, &option_index )) != -1 ) {
     switch ( ch ) {
+    case 'a':
+      acps = atoi(optarg);
+      break;
+
     case 'b':
       dbfile = optarg;
       break;
@@ -176,6 +262,10 @@ int main(int argc, char *argv[])
 
     case 'd':
       decim = atoi(optarg);
+      break;
+
+    case 'D':
+      dump_params=true;
       break;
 
     case 'h':
@@ -189,6 +279,10 @@ int main(int argc, char *argv[])
 
     case 'p':
       num_pulses = atoi(optarg);
+      break;
+
+    case 'P':
+      param_file = std::string(optarg);
       break;
 
     case 'r':
@@ -347,6 +441,24 @@ int main(int argc, char *argv[])
   if(rp_app_init() < 0) {
     fprintf(stderr, "rp_app_init() failed!\n");
     return -1;
+  }
+
+  if (dump_params) {
+    for (auto i = name_map.begin(); i != name_map.end(); ++i) {
+      std::cout << i->first << ' ' << get_param(i->first) << std::endl;
+    }
+    exit(0);
+  };
+
+  if (param_file.size() > 0) {
+    std::ifstream pin (param_file);
+    std::string name;
+    uint32_t val;
+    for (;;) {
+      if (! (pin >> name >> val))
+        break;
+      set_param(name, val);
+    };
   }
 
   /* Setting of parameters in Oscilloscope main module */
