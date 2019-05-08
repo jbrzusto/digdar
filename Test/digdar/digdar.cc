@@ -1,5 +1,5 @@
 /**
- * 
+ *
  * forked from:
  *
  * $Id: acquire.c 1246 2014-02-22 19:05:19Z ales.bardorfer $
@@ -43,19 +43,19 @@
  *
  * The code below acquires up to 16k samples on both Red Pitaya input
  * channels labeled ADC1 & ADC2.
- * 
+ *
  * It utilizes the routines of the Oscilloscope module for:
  *   - Triggered ADC signal acqusition to the FPGA buffers.
  *   - Parameter defined averaging & decimation.
  *   - Data transfer to SW buffers.
  *
- * Although the Oscilloscope routines export many functionalities, this 
+ * Although the Oscilloscope routines export many functionalities, this
  * simple signal acquisition utility only exploits a few of them:
  *   - Synchronization between triggering & data readout.
  *   - Only AUTO triggering is used by default.
  *   - Only decimation is parsed to t_params[8].
  *
- * Please feel free to exploit any other scope functionalities via 
+ * Please feel free to exploit any other scope functionalities via
  * parameters defined in t_params.
  *
  */
@@ -318,7 +318,7 @@ int main(int argc, char *argv[])
           usage();
           exit ( EXIT_FAILURE );
         }
-            
+
         break;
       case 'v':
         fprintf(stdout, "%s version %s-%s\n", g_argv0, VERSION_STR, REVISION_STR);
@@ -397,15 +397,15 @@ int main(int argc, char *argv[])
     cap->set_pulses_per_transaction (chunk_size); // commit to keeping data for at least chunk_size pulses
 
     double ts = now();
-    cap->record_geo(ts, 
+    cap->record_geo(ts,
                     45.371907, -64.402584, 30, // lat, lon, alt of Fundy Force radar site
                     0); // heading offset, in degrees
 
-  }    
+  }
 
 
   switch(decim) {
-  case 1: 
+  case 1:
   case 2:
   case 3:
   case 4:
@@ -413,7 +413,7 @@ int main(int argc, char *argv[])
   case 64:
   case 1024:
   case 8192:
-  case 65536: 
+  case 65536:
     break;
   default:
     fprintf(stderr, "incorrect value (%d) for decimation; must be 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n", decim);
@@ -421,15 +421,15 @@ int main(int argc, char *argv[])
   }
 
   t_params[DECIM_FACTOR_PARAM] = decim;
-      
+
   if (n_samples > 16384 || n_samples < 0) {
     fprintf(stderr, "incorrect value (%d) for samples per pulse; must be 0..16384\n", n_samples);
     return -1;
   }
 
   if (use_sum && decim > 4) {
-    fprintf(stderr, "cannot specify --sum when decimation rate is > 4\n");
-    return -1;
+    fprintf(stderr, "warning cannot specify --sum when decimation rate is > 4; ignoring\n");
+    use_sum = false;
   }
 
   if (outfd == -1) {
@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "rp_set_params() failed!\n");
     return -1;
   }
-    
+
   psize = sizeof(pulse_metadata) + sizeof(uint16_t) * (n_samples - 1);
 
   pulse_buffer = (pulse_metadata *) calloc(num_pulses, psize);
@@ -482,7 +482,7 @@ int main(int argc, char *argv[])
   }
 
   num_chunks = num_pulses / chunk_size;
-  
+
   pulses_in_chunk = (uint16_t *) calloc(num_chunks, sizeof(uint16_t));
 
   // fill in magic number in pulse headers
@@ -541,4 +541,3 @@ int main(int argc, char *argv[])
   }
   return 0;
 }
-
