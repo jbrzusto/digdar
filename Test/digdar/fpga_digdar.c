@@ -1,6 +1,6 @@
-/** 
+/**
  * $Id: fpga_osc.c 881 2013-12-16 05:37:34Z rp_jmenart $
- * 
+ *
  * @brief Red Pitaya Oscilloscope FPGA controller.
  *
  * @Author Jure Menart <juremenart@gmail.com>
@@ -27,29 +27,29 @@
 
 /**
  * GENERAL DESCRIPTION:
- * 
+ *
  * This module initializes and provides for other SW modules the access to the
  * FPGA OSC module. The oscilloscope memory space is divided to three parts:
  *   - registers (control and status)
  *   - input signal buffer (Channel A)
  *   - input signal buffer (Channel B)
- * 
+ *
  * This module maps physical address of the oscilloscope core to the logical
  * address, which can be used in the GNU/Linux user-space. To achieve this,
- * OSC_FPGA_BASE_ADDR from CPU memory space is translated automatically to 
+ * OSC_FPGA_BASE_ADDR from CPU memory space is translated automatically to
  * logical address with the function mmap(). After all the initialization is done,
  * other modules can use this module to controll oscilloscope FPGA core. Before
  * any functions or functionality from this module can be used it needs to be
  * initialized with osc_fpga_init() function. When this module is no longer
  * needed osc_fpga_exit() must be called.
- *  
- * FPGA oscilloscope state machine in various modes. Basic principle is that 
+ *
+ * FPGA oscilloscope state machine in various modes. Basic principle is that
  * SW sets the machine, 'arm' the writting machine (FPGA writes from ADC to
- * input buffer memory) and then set the triggers. FPGA machine is continue 
+ * input buffer memory) and then set the triggers. FPGA machine is continue
  * writting to the buffers until the trigger is detected plus the amount set
  * in trigger delay register. For more detauled description see the FPGA OSC
  * registers description.
- * 
+ *
  * Nice example how to use this module can be seen in worker.c module.
  */
 
@@ -80,8 +80,8 @@ const int c_osc_fpga_adc_bits = 14;
 /** Slow ADC number of bits */
 const int c_osc_fpga_xadc_bits = 12;
 
-/** @brief Max and min voltage on ADCs. 
- * Symetrical - Max Voltage = +14, Min voltage = -1 * c_osc_fpga_max_v 
+/** @brief Max and min voltage on ADCs.
+ * Symetrical - Max Voltage = +14, Min voltage = -1 * c_osc_fpga_max_v
  */
 const float c_osc_fpga_adc_max_v  = +14;
 /** Sampling frequency = 125Mspmpls (non-decimated) */
@@ -91,7 +91,7 @@ const float c_osc_fpga_smpl_period = (1. / 125e6);
 
 /**
  * @brief Internal function used to clean up memory.
- * 
+ *
  * This function un-maps FPGA register and signal buffers, closes memory file
  * descriptor and cleans all memory allocated by this module.
  *
@@ -125,9 +125,9 @@ int __osc_fpga_cleanup_mem(void)
 
 /**
  * @brief Maps FPGA memory space and prepares register and buffer variables.
- * 
+ *
  * This function opens memory device (/dev/mem) and maps physical memory address
- * OSC_FPGA_BASE_ADDR (of length OSC_FPGA_BASE_SIZE) to logical addresses. It 
+ * OSC_FPGA_BASE_ADDR (of length OSC_FPGA_BASE_SIZE) to logical addresses. It
  * initializes the pointers g_osc_fpga_reg_mem, g_osc_fpga_cha_mem and
  * g_osc_fpga_chb_mem to point to FPGA OSC.
  * If function failes FPGA variables must not be used.
@@ -153,7 +153,7 @@ int osc_fpga_init(void)
     }
 
     /* Calculate correct page address and offset from OSC_FPGA_BASE_ADDR and
-     * OSC_FPGA_BASE_SIZE 
+     * OSC_FPGA_BASE_SIZE
      */
     page_addr = OSC_FPGA_BASE_ADDR & (~(page_size-1));
     page_off  = OSC_FPGA_BASE_ADDR - page_addr;
@@ -171,16 +171,16 @@ int osc_fpga_init(void)
     /* Set FPGA OSC module pointers to correct values. */
     g_osc_fpga_reg_mem = page_ptr + page_off;
 
-    g_osc_fpga_cha_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_cha_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_CHA_OFFSET / sizeof(uint32_t));
 
-    g_osc_fpga_chb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_chb_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_CHB_OFFSET / sizeof(uint32_t));
 
-    g_osc_fpga_xcha_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_xcha_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_XCHA_OFFSET / sizeof(uint32_t));
 
-    g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem + 
+    g_osc_fpga_xchb_mem = (uint32_t *)g_osc_fpga_reg_mem +
         (OSC_FPGA_XCHB_OFFSET / sizeof(uint32_t));
 
     page_addr = DIGDAR_FPGA_BASE_ADDR & (~(page_size-1));
@@ -201,7 +201,7 @@ int osc_fpga_init(void)
 
 /**
  * @brief Cleans up FPGA OSC module internals.
- * 
+ *
  * This function closes the memory file descriptor, unmap the FPGA memory space
  * and cleans also all other internal things from FPGA OSC module.
  * @retval 0 Sucess
@@ -263,7 +263,7 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  *
  * This function updates trigger related parameters in FPGA registers.
  *
- * @param [in] trig_imm Trigger immediately - if set to 1, FPGA state machine 
+ * @param [in] trig_imm Trigger immediately - if set to 1, FPGA state machine
  *                      will trigger immediately and other trigger parameters
  *                      will be ignored.
  * @param [in] trig_source Trigger source, as defined in rp_main_params.
@@ -279,25 +279,25 @@ void get_equ_shape_filter(ecu_shape_filter_t *filt, uint32_t equal,
  *
  * @retval 0 Success
  * @retval -1 Failure
- * 
+ *
  * @see rp_main_params
  */
-int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
+int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
                            float trig_delay, float trig_level, int decim_factor,
                            int equal, int shaping, int gain1, int gain2)
 {
-    int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source, 
+    int fpga_trig_source = osc_fpga_cnv_trig_source(trig_imm, trig_source,
                                                     trig_edge);
     int fpga_delay;
     float after_trigger; /* how much after trigger FPGA should write */
     int fpga_trig_thr = osc_fpga_cnv_v_to_cnt(trig_level);
-    
+
     /* Equalization filter coefficients */
     ecu_shape_filter_t cha_filt;
     ecu_shape_filter_t chb_filt;
     get_equ_shape_filter(&cha_filt, equal, shaping, gain1);
     get_equ_shape_filter(&chb_filt, equal, shaping, gain2);
-    
+
     if((fpga_trig_source < 0) || (decim_factor < 0)) {
         fprintf(stderr, "osc_fpga_update_params() failed\n");
         return -1;
@@ -305,11 +305,11 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
 
     /* Pre-trigger - we need to limit after trigger acquisition so we can
      * readout historic (pre-trigger) values */
-    
+
     if (trig_imm)
       after_trigger=OSC_FPGA_SIG_LEN* c_osc_fpga_smpl_period * decim_factor;
     else
-    after_trigger = 
+    after_trigger =
         ((OSC_FPGA_SIG_LEN-7) * c_osc_fpga_smpl_period * decim_factor) +
         trig_delay;
 
@@ -320,7 +320,7 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
 
     /* Trig source is written after ARM */
     /*    g_osc_fpga_reg_mem->trig_source   = fpga_trig_source;*/
-    if(trig_source == 0) 
+    if(trig_source == 0)
         g_osc_fpga_reg_mem->cha_thr   = fpga_trig_thr;
     else
         g_osc_fpga_reg_mem->chb_thr   = fpga_trig_thr;
@@ -333,17 +333,17 @@ int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge,
     g_osc_fpga_reg_mem->cha_filt_bb = cha_filt.bb;
     g_osc_fpga_reg_mem->cha_filt_pp = cha_filt.pp;
     g_osc_fpga_reg_mem->cha_filt_kk = cha_filt.kk;
-    
+
     g_osc_fpga_reg_mem->chb_filt_aa = chb_filt.aa;
     g_osc_fpga_reg_mem->chb_filt_bb = chb_filt.bb;
     g_osc_fpga_reg_mem->chb_filt_pp = chb_filt.pp;
     g_osc_fpga_reg_mem->chb_filt_kk = chb_filt.kk;
-    
+
     return 0;
 }
 
 /** @brief OSC FPGA reset
- * 
+ *
  * Triggers internal oscilloscope FPGA state machine reset.
  *
  * @retval 0 Always returns 0.
@@ -362,16 +362,16 @@ int osc_fpga_reset(void)
  */
 int osc_fpga_arm_trigger(void)
 {
-  g_osc_fpga_reg_mem->digdar_extra_options = 23;  // 1: only buffer samples *after* being triggered; 2: negate range of sample values; 4: double-width reads; 16: return sum 
+  g_osc_fpga_reg_mem->digdar_extra_options = 21;  // 1: only buffer samples *after* being triggered; (no: 2: negate range of sample values); 4: double-width reads; 16: return sum
   g_osc_fpga_reg_mem->conf |= OSC_FPGA_CONF_ARM_BIT;
     return 0;
 }
 
 /** @brief Sets the trigger source in OSC FPGA register.
  *
- * Sets the trigger source in oscilloscope FPGA register. 
+ * Sets the trigger source in oscilloscope FPGA register.
  *
- * @param [in] trig_source Trigger source, as defined in FPGA register 
+ * @param [in] trig_source Trigger source, as defined in FPGA register
  *                         description.
  */
 int osc_fpga_set_trigger(uint32_t trig_source)
@@ -382,7 +382,7 @@ int osc_fpga_set_trigger(uint32_t trig_source)
 
 /** @brief Sets the decimation rate in the OSC FPGA register.
  *
- * Sets the decimation rate in the oscilloscope FPGA register. 
+ * Sets the decimation rate in the oscilloscope FPGA register.
  *
  * @param [in] decim_factor decimation factor, which must be
  * one of the valid values for the FPGA build:
@@ -396,11 +396,11 @@ int osc_fpga_set_decim(uint32_t decim_factor)
 
 /** @brief Sets the trigger delay in OSC FPGA register.
  *
- * Sets the trigger delay in oscilloscope FPGA register. 
+ * Sets the trigger delay in oscilloscope FPGA register.
  *
- * @param [in] trig_delay Trigger delay, as defined in FPGA register 
+ * @param [in] trig_delay Trigger delay, as defined in FPGA register
  *                         description.
- * 
+ *
  * @retval 0 Always returns 0.
  */
 int osc_fpga_set_trigger_delay(uint32_t trig_delay)
@@ -424,12 +424,12 @@ int osc_fpga_triggered(void)
 /** @brief Returns memory pointers for both input signal buffers.
  *
  * This function returns pointers for input signal buffers for all 4 channels.
- * 
+ *
  * @param [out] cha_signal Output pointer for Channel A buffer
  * @param [out] chb_signal Output pointer for Channel B buffer
  * @param [out] xcha_signal Output pointer for Slow Channel A buffer
  * @param [out] xchb_signal Output pointer for Slow Channel B buffer
- * 
+ *
  * @retval 0 Always returns 0.
  */
 int osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal, int **xchb_signal)
@@ -469,7 +469,7 @@ int osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig)
  *                      are ignored.
  * @param [in] trig_source Trigger source as defined in rp_main_params
  * @param [in] trig_edge Trigger edge as defined in rp_main_params
- * 
+ *
  * @retval -1 Error
  * @retval otherwise Trigger source FPGA value
   */
@@ -477,7 +477,7 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
 {
     int fpga_trig_source = 0;
 
-    /* Trigger immediately */    
+    /* Trigger immediately */
     if(trig_imm)
         return 1;
 
@@ -514,10 +514,10 @@ int osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge)
  *
  * This function converts time in [s], based on current decimation factor to
  * number of samples at ADC sampling frequency.
- * 
+ *
  * @param [in] time Time in [s]
  * @param [in] dec_factor Decimation factor
- * 
+ *
  * @retval Number of ADC samples define dby input parameters.
  */
 int osc_fpga_cnv_time_to_smpls(float time, int dec_factor)
@@ -530,11 +530,11 @@ int osc_fpga_cnv_time_to_smpls(float time, int dec_factor)
 }
 
 /** @brief Converts voltage to ADC counts.
- * 
+ *
  * This function converts voltage in [V] to ADC counts.
- * 
+ *
  * @param [in] voltage Voltage in [V]
- * 
+ *
  * @retval adc_cnts ADC counts
  */
 int osc_fpga_cnv_v_to_cnt(float voltage)
@@ -543,12 +543,12 @@ int osc_fpga_cnv_v_to_cnt(float voltage)
 
     if((voltage > c_osc_fpga_adc_max_v) || (voltage < -c_osc_fpga_adc_max_v))
         return -1;
-    
-    adc_cnts = (int)round(voltage * (float)((int)(1<<c_osc_fpga_adc_bits)) / 
+
+    adc_cnts = (int)round(voltage * (float)((int)(1<<c_osc_fpga_adc_bits)) /
                           (2*c_osc_fpga_adc_max_v));
 
     /* Clip highest value (+14 is calculated in int32_t to 0x2000, but we have
-     * only 14 bits 
+     * only 14 bits
      */
     if((voltage > 0) && (adc_cnts & (1<<(c_osc_fpga_adc_bits-1))))
         adc_cnts = (1<<(c_osc_fpga_adc_bits-1))-1;
@@ -561,9 +561,9 @@ int osc_fpga_cnv_v_to_cnt(float voltage)
 /** @brief Converts ADC counts to voltage
  *
  * This function converts ADC counts to voltage (in [V])
- * 
+ *
  * @param [in] cnts ADC counts
- * 
+ *
  * @retval voltage Voltage in [V]
  */
 float osc_fpga_cnv_cnt_to_v(int cnts)
@@ -583,9 +583,9 @@ float osc_fpga_cnv_cnt_to_v(int cnts)
 /** @brief Converts Slow ADC counts to voltage
  *
  * This function converts Slow ADC counts to voltage (in [V])
- * 
+ *
  * @param [in] cnts Slow ADC counts
- * 
+ *
  * @retval voltage Voltage in [V]
  */
 float osc_fpga_cnv_xcnt_to_v(int cnts)
@@ -601,4 +601,3 @@ float osc_fpga_cnv_xcnt_to_v(int cnts)
     }
     return m;
 }
-
