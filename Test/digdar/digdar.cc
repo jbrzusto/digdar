@@ -35,7 +35,6 @@
 #include "fpga_digdar.h"
 #include "version.h"
 #include "worker.h"
-#include "capture_db.h"
 #include "pulse_metadata.h"
 
 /**
@@ -79,7 +78,10 @@ void usage() {
     "Usage: %s [OPTION]\n"
     "\n"
     "  --acps -a NACP Number of ACPs per sweep; default: 450, which is appropriate for a Furuno FR radar\n"
-    "  --dbfile -b FILENAME  Database filename; capture to this sqlite database instead of writing to stdout or TCP\n"
+    "  --cut -C CUT Azimuth (given as a fraction in [0..1] from heading) at which sweeps begin.\n"
+    "           Default: 0.  This is used to avoid the ~2.5 second discontinuity in data\n"
+    "           from occuring at an inconvenient location in the data field.\n"
+    "           NOTE: this option must come *after* --acps, if that option is given.\n"
     "  --decim  -d DECIM   Decimation rate: one of 1, 2, 3, 4, 8, 64, 1024, 8192, or 65536\n"
     "  --dump_params -D  don't run - just dump current FPGA parameter values as NAME VAL\n"
     "  --sum   If specified, return the sum (in 16-bits) of samples in the decimation period.\n"
@@ -91,8 +93,9 @@ void usage() {
     "  --remove -r START:END  Remove sector.  START and END are portions of the circle in [0, 1]\n"
     "                         where 0 is the start of the ARP pulse, and 1 is the start of the next ARP\n"
     "                         pulse.  Pulses within the sector from START to END are remoted and not output.\n"
-    "                         If START > END, the removed sector consists of [END, 1] U [0, START].\n"
+    "                         If START > END, the removed sector consists of [START, 1] U [0, END].\n"
     "                         Multiple --remove options may be given.\n"
+    "           NOTE: this option must come *after* --acps, if that option is given.\n"
     "  --chunk_size -c Number of pulses to transfer in each chunk\n"
     "  --tcp HOST:PORT instead of writing to stdout, open a TCP socket connection to PORT on HOST and\n"
     "                  write there.\n"
@@ -116,7 +119,8 @@ std::map<std::string, int> name_map;
 void set_param (std::string name, uint32_t value) {
   // set the FPGA parameter given by name to the specified value
   // All settable FPGA register values are 32 bits.
-  * (uint32_t *) (((char *) g_digdar_fpga_reg_mem) + 4 * name_map[name]) = value;
+  if (name_map.find(name) != name_map.end())
+    * (uint32_t *) (((char *) g_digdar_fpga_reg_mem) + 4 * name_map[name]) = value;
 };
 
 uint32_t get_param (std::string name) {
@@ -192,8 +196,8 @@ uint16_t *pulses_in_chunk = 0; // number of pulses actually in each chunk
 uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
 uint16_t use_sum = 0; // if non-zero, return sum of samples rather than truncated average
 uint16_t acps = 450; // number of ACPs per sweep; used in calculating removal
+uint16_t cut = 0; // number of ACPs after heading pulse at which to cut between sweeps
 int outfd = -1; // file descriptor for output; fileno(stdout) by default;
-capture_db * cap = 0; // pointer to capture database structure, if capturing to sqlite
 
 // boilerplate ougoing socket connection fields, from Linux man-pages
 
@@ -203,12 +207,10 @@ int sfd, s;
 struct sockaddr_storage peer_addr;
 socklen_t peer_addr_len;
 ssize_t nread;
-
 pulse_metadata *pulse_buffer = 0;
 
 char * host = 0;
 char * port = 0;
-char * dbfile = 0;
 
 bool dump_params = false; // if true, just dump all digdar FPGA registers as NAME VALUE
 std::string param_file; // if specified, read parameters from this file and set FPGA regs appropriately
@@ -229,9 +231,8 @@ int main(int argc, char *argv[])
   static struct option long_options[] = {
     /* These options set a flag. */
     {"acps", required_argument, 0, 'a'},
-    {"dbfile", required_argument, 0, 'b'},
     {"decim", required_argument,       0, 'd'},
-    {"dump", no_argument, 0, 'D'},
+    {"dump_params", no_argument, 0, 'D'},
     {"samples",      required_argument,       0, 'n'},
     {"sum",      no_argument,       0, 's'},
     {"pulses",       required_argument,       0, 'p'},
@@ -243,7 +244,7 @@ int main(int argc, char *argv[])
     {"help",         no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
-  const char *optstring = "ab:c:d:Dhn:p:P:r:st:v";
+  const char *optstring = "aC:c:d:Dhn:p:P:r:st:v";
 
   /* getopt_long stores the option index here. */
   int option_index = 0;
@@ -255,8 +256,8 @@ int main(int argc, char *argv[])
       acps = atoi(optarg);
       break;
 
-    case 'b':
-      dbfile = optarg;
+    case 'C':
+      cut = atof(optarg) * acps;
       break;
 
     case 'c':
@@ -333,10 +334,6 @@ int main(int argc, char *argv[])
   }
 
   if (host) {
-    if (dbfile) {
-      fprintf(stderr, "You can only specify capturing to a database (--dbfile / -b) *or* to the network (--tcp / -t), but not to both.");
-      return -2;
-    }
 
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family = AF_INET;    /* Allow IPv4 only */
@@ -373,36 +370,6 @@ int main(int argc, char *argv[])
       exit(EXIT_FAILURE);
     }
   }
-
-  if (dbfile) {
-    cap = new capture_db(dbfile, "capture_pulse_timestamp", "/capture_pulse_timestamp");
-
-    // assume short-pulse mode for Bridgemaster E
-
-    cap->set_radar_mode( 25e3, // pulse power, watts
-                         50, // pulse length, nanoseconds
-                         1800, // pulse repetition frequency, Hz
-                         28  // antenna rotation rate, RPM
-                         );
-
-    // record digitizing mode
-    cap->set_digitize_mode( 125e6 / decim, // digitizing rate, Hz
-                            16,   // only uses lowest 14 bits when truncated average
-                            ((decim <= 4) ? decim : 1 ) * (1<<14 - 1), // scale: max sample value possible
-                            n_samples  // samples per pulse
-                            );
-
-    cap->set_retain_mode ("full"); // keep all samples from all pulses
-
-    cap->set_pulses_per_transaction (chunk_size); // commit to keeping data for at least chunk_size pulses
-
-    double ts = now();
-    cap->record_geo(ts,
-                    45.371907, -64.402584, 30, // lat, lon, alt of Fundy Force radar site
-                    0); // heading offset, in degrees
-
-  }
-
 
   switch(decim) {
   case 1:
@@ -446,6 +413,23 @@ int main(int argc, char *argv[])
     return -1;
   }
 
+  if (param_file.size() > 0) {
+    std::ifstream pin (param_file);
+    std::string name;
+    uint32_t val;
+    for (;;) {
+      if (! (pin >> name))
+        break;
+      if (name[0] == '#') {
+        // comment: skip rest of line
+        pin.ignore(100000, '\n');
+        continue;
+      }
+      pin >> val;
+      set_param(name, val);
+    };
+  }
+
   if (dump_params) {
     for (auto i = name_map.begin(); i != name_map.end(); ++i) {
       std::cout << i->first << ' ' << get_param(i->first) << std::endl;
@@ -453,16 +437,6 @@ int main(int argc, char *argv[])
     exit(0);
   };
 
-  if (param_file.size() > 0) {
-    std::ifstream pin (param_file);
-    std::string name;
-    uint32_t val;
-    for (;;) {
-      if (! (pin >> name >> val))
-        break;
-      set_param(name, val);
-    };
-  }
 
   /* Setting of parameters in Oscilloscope main module */
 
@@ -508,36 +482,18 @@ int main(int argc, char *argv[])
       sched_yield();
       continue;
     }
-    if (cap) {
-      int i;
-      for (i = 0; i < num_pulses; ++i) {
-        pulse_metadata *meta = (pulse_metadata *) (((char *) pulse_buffer) + cur_pulse++ * psize);
-        double ts = meta->arp_clock_sec + 1.0e-9*(meta->arp_clock_nsec + 8 * meta->trig_clock);
-        uint16_t *samples = (uint16_t *) (((char *) meta) + sizeof(pulse_metadata) - sizeof(uint16_t));
-
-        cap->record_pulse (ts,
-                           meta->num_trig,
-                           meta->trig_clock,
-                           meta->acp_clock,
-                           meta->num_arp,
-                           0, // constant 0 elevation angle for FORCE radar
-                           0, // constant polarization for FORCE radar
-                           samples);
-      }
-    } else {
-      int n = num_pulses * psize;
-      int offset = 0;
-      int m;
-      do {
-        m = write(outfd, ((char *) pulse_buffer) + cur_pulse * psize + offset, n);
-        if (m < 0)
-          break;
-        n -= m;
-        offset += m;
-      } while (n > 0);
+    int n = num_pulses * psize;
+    int offset = 0;
+    int m;
+    do {
+      m = write(outfd, ((char *) pulse_buffer) + cur_pulse * psize + offset, n);
       if (m < 0)
         break;
-    }
+      n -= m;
+      offset += m;
+    } while (n > 0);
+    if (m < 0)
+      break;
   }
   return 0;
 }
