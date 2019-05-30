@@ -426,23 +426,23 @@ void *rp_osc_worker_thread(void *args)
       uint32_t tmp;
       if (tr_ptr & 1) {
         tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-        data[0] = 0x11fff - (tmp >> 16);
+        data[0] = tmp >> 16;
         ++i;
       }
       for (/**/ ; i < n1; ++i) {
         tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-        data[i] = 0x11fff -  (tmp & 0xffff);
+        data[i] = tmp & 0xffff;
         if (++i < n1)
-          data[i] = 0x11fff - (tmp >> 16);
+          data[i] = tmp >> 16;
       }
       if (n2) {
         src_data = & rp_fpga_cha_signal[0];
         data = &data[i];
         for (i = 0; i < n2; ++i) {
           tmp = src_data[i]; // double-width read from the FPGA, as this is the rate-limiting step
-          data[i] = 0x11fff - (tmp & 0xffff);
+          data[i] = tmp & 0xffff;
           if (++i < n2)
-            data[i] = 0x11fff - (tmp >> 16);
+            data[i] = tmp >> 16;
         }
       }
       ++cur_pulse;
