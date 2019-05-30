@@ -398,7 +398,7 @@ void *rp_osc_worker_thread(void *args)
       /* check whether this pulse is in a removal segment */
       if (num_removals) {
         int keep = 1;
-        float rr = pbm->acp_clock;
+        uint16_t rr = pbm->acp_clock;
         for (int i = 0; keep && i < num_removals; ++i) {
           if (removals[i].begin <= removals[i].end) {
             if (rr >= removals[i].begin && rr <= removals[i].end)
