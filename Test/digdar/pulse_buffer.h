@@ -1,7 +1,7 @@
 /* -*- c++ -*- */
 /*
- * Copyright 2011, 2014 John Brzustowski
- * 
+ * Copyright 2011-2019 John Brzustowski
+ *
  * This file is part of digdar.
  */
 
@@ -37,10 +37,10 @@ typedef std::list<sweep_buffer *>::iterator t_ordered_bufs_iter;
 typedef void (*t_pulse_callback)(t_sample *buf, unsigned short len, pulse_metadata *meta, void *);
 
 class usrp_pulse_buffer {
-  
+
 protected:
   usrp_bbprx_sptr		 urx;			/**< pointer to the underlying USRP host */
-  unsigned long long		 n_total;		/**< total pulses digitized since reset */ 
+  unsigned long long		 n_total;		/**< total pulses digitized since reset */
   unsigned int                   n_pulses;              /**< number of "pulses" (real or raw) to obtain per buffer */
   unsigned int                   n_samples;             /**< number of samples to obtain per pulse */
   unsigned int                   n_bufs;                /**< number of sweep buffers to maintain */
@@ -174,28 +174,28 @@ public:
    * \brief Set the pulse callback function.
    * \param pulse_callback the pulse callback function, or NULL to disable pulse callbacks
    * \param user_data a user data parameter to pass to the callback.
-   * 
-   */ 
+   *
+   */
   void set_pulse_callback (t_pulse_callback pulse_callback, void * user_data);
 
   /*!
    * \brief Start a thread which acquires data into ring buffers
-   * 
+   *
    * returns true on success, false otherwise
-   * 
-   */ 
+   *
+   */
   bool begin_getter ();
 
 
   /*!
    * \brief Stop the data getter thread. Also stops the copy thread, if it exists.
    * returns true on success, false otherwise
-   * 
-   */ 
+   *
+   */
   bool end_getter ();
 
 
-  /*! 
+  /*!
   * \brief Get the oldest available sweep of pulse data.  The getter thread must have been started first, by calling begin_getter()
   *
   * \param buf [input] pointer to the destination buffer
@@ -205,9 +205,9 @@ public:
   * \param gated if true, gate the data, selecting pulses from evenly around the sweep.  n_pulses is then
   * the desired number of pulses.  Pulses are decimated and/or replicated to match the current PRF to the
   * desired number of pulses.  If false, then all pulses are retained, and n_pulses indicates the maximum
-  * number returned.  If the sweep ends before n_pulses have been seen, then only the number 
+  * number returned.  If the sweep ends before n_pulses have been seen, then only the number
   *
-  * \param samples_per_pulse the number of samples to retain for each pulse; if we are digitizing with 
+  * \param samples_per_pulse the number of samples to retain for each pulse; if we are digitizing with
   * fewer samples per pulse (see d_samples_per_pulse), then the additional sample values will be set to zero.
   *
   * \param meta [output] pointer to a buffer of pulse_metadata structures to be filled with the metadata for returned pulses.
@@ -221,20 +221,20 @@ public:
   unsigned int get_sweep (t_sample *buf, bool gated, unsigned int n_pulses, unsigned short samples_per_pulse, struct pulse_metadata *meta, double *pulse_angles, double *pulse_times, struct sweep_metadata *smeta);
 
 
-  /*! 
+  /*!
   * \brief Get the oldest available sweep of pulse data without blocking.  The getter thread must be running.
   *
   * \param buf [output] pointer to the destination buffer
   *
-  * \param samples_per_pulse the number of samples to retain for each pulse; if we are digitizing with 
+  * \param samples_per_pulse the number of samples to retain for each pulse; if we are digitizing with
   * fewer samples per pulse (see d_samples_per_pulse), then the additional sample values will be set to zero.
   *
-  * \param n_pulses the desired (and maximum) number of pulses the dest_buf can hold. 
+  * \param n_pulses the desired (and maximum) number of pulses the dest_buf can hold.
   *
   * \param gated if true, gate the data, selecting pulses from evenly around the sweep.  n_pulses is then
   * the desired number of pulses.  Pulses are decimated and/or replicated to match the current PRF to the
   * desired number of pulses.  If false, then all pulses are retained, and n_pulses indicates the maximum
-  * number returned.  If the sweep ends before n_pulses have been seen, then only the number 
+  * number returned.  If the sweep ends before n_pulses have been seen, then only the number
   *
   * \param meta [output] pointer to a buffer of pulse_metadata structures to be filled with the metadata for returned pulses.
   * Can be NULL.  If not NULL, must be allocated to hold at least n_pulses elements of type pulse_metadata.
@@ -253,14 +253,14 @@ public:
   bool get_sweep_nb (t_sample *buf, bool gated, unsigned int n_pulses, unsigned short samples_per_pulse, struct pulse_metadata *meta, double *pulse_angles, double *pulse_times, struct sweep_metadata *smeta, got_sweep_function user_fun, void *user_data);
 
 
-  /*! 
-  * \brief convert a duration to a double, in seconds 
+  /*!
+  * \brief convert a duration to a double, in seconds
   */
   static inline double duration_to_double(t_duration dur) {
     return dur.total_milliseconds() / 1000.0;
   };
 
-  /*! 
+  /*!
   * \brief convert a double in seconds to a duration
   */
   static inline t_duration double_to_duration(double secs) {
@@ -269,7 +269,7 @@ public:
     return boost::posix_time::seconds((long) floor(secs)) + boost::posix_time::milliseconds((long)round(1000 * fmod(secs, 1.0)));
   };
 
-  /*! 
+  /*!
   * \brief convert a double, in seconds past the epoch, to a timestamp
   */
   static inline t_timestamp double_to_timestamp(double secs_AE) {
@@ -279,7 +279,7 @@ public:
       boost::posix_time::milliseconds((long) round(1000 * fmod(secs_AE, 1.0)));
   };
 
-  /*! 
+  /*!
   * \brief convert a timestamp to a double number of seconds past the epoch
   */
   static inline double timestamp_to_double(t_timestamp ts) {
@@ -302,7 +302,7 @@ public:
 
 };
 
-  /*! 
+  /*!
   * \brief Struct for the copy thread
   */
 struct copy_thread_info {

@@ -1,15 +1,15 @@
 /* -*- c++ -*- */
 /*
- * Copyright 2011, 2014 John Brzustowski
- * 
+ * Copyright 2011-2019 John Brzustowski
+ *
  * This file is part of digdar.
- * 
+ *
  */
 
 #ifndef INCLUDED_SWEEP_BUFFER_H
 #define INCLUDED_SWEEP_BUFFER_H
 
-#define BOOST_THREAD_USE_LIB 
+#define BOOST_THREAD_USE_LIB
 #include <boost/thread/thread.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/condition_variable.hpp>
@@ -26,7 +26,7 @@ class sweep_buffer;  // forward declaration
 class pulse_buffer; // forward declaration
 
 class sweep_buffer
-{ 
+{
  friend class pulse_buffer;
  friend class std::vector<sweep_buffer>;
 
@@ -62,7 +62,7 @@ class sweep_buffer
    * \brief return angle for i'th pulse, in radians clockwise from the ARP pulse
    */
   double pulse_angle(unsigned int i);
-  
+
   /*!
    * \brief mark buffer as empty
    */
@@ -73,12 +73,12 @@ class sweep_buffer
    */
   static sweep_buffer* make ();
 
-  
+
 private:
   /*!
    * \brief constructor
    */
-  sweep_buffer();                                       
+  sweep_buffer();
 
   sweep_metadata		smeta;			/**< metadata for the sweep in this buffer */
   t_buf_status                  status;			/**< status of the buffer */
