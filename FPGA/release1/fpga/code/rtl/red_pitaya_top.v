@@ -1,8 +1,8 @@
 /**
  * $Id: red_pitaya_top.v 1271 2014-02-25 12:32:34Z matej.oblak $
  *
- * @brief Red Pitaya TOP module. It connects external pins and PS part with 
- *        other application modules. 
+ * @brief Red Pitaya TOP module. It connects external pins and PS part with
+ *        other application modules.
  *
  * @Author Matej Oblak
  *
@@ -18,11 +18,11 @@
 /**
  * GENERAL DESCRIPTION:
  *
- * Top module connects PS part with rest of Red Pitaya applications.  
+ * Top module connects PS part with rest of Red Pitaya applications.
  *
  *
  *
- *                   /-------\      
+ *                   /-------\
  *   PS DDR <------> |  PS   |      AXI <-> custom bus
  *   PS MIO <------> |   /   | <------------+
  *   PS CLK -------> |  ARM  |              |
@@ -43,7 +43,7 @@
  *                         |                |
  *                         |                |
  *                         |  /-------\     |
- *                         -- |  ASG  | <---+ 
+ *                         -- |  ASG  | <---+
  *                            \-------/     |
  *                                          |
  *                                          |
@@ -51,8 +51,8 @@
  *             /--------\                   |
  *    RX ----> |        |                   |
  *   SATA      | DAISY  | <-----------------+
- *    TX <---- |        | 
- *             \--------/ 
+ *    TX <---- |        |
+ *             \--------/
  *               |    |
  *               |    |
  *               (FREE)
@@ -68,7 +68,7 @@
  *
  * Daisy chain connects with other boards with fast serial link. Data which is
  * send and received is at the moment undefined. This is left for the user.
- * 
+ *
  */
 
 
@@ -123,7 +123,7 @@ module red_pitaya_top
  `endif
 
    // Red Pitaya periphery
-  
+
    // ADC
    input  [16-1: 2] adc_dat_a_i        ,  // ADC CH1
    input  [16-1: 2] adc_dat_b_i        ,  // ADC CH2
@@ -131,16 +131,6 @@ module red_pitaya_top
    input            adc_clk_n_i        ,  // ADC data clock
    output [ 2-1: 0] adc_clk_o          ,  // optional ADC clock source
    output           adc_cdcs_o         ,  // ADC clock duty cycle stabilizer
-  
-   // DAC
-   output [14-1: 0] dac_dat_o          ,  // DAC combined data
-   output           dac_wrt_o          ,  // DAC write
-   output           dac_sel_o          ,  // DAC channel select
-   output           dac_clk_o          ,  // DAC clock
-   output           dac_rst_o          ,  // DAC reset
-  
-   // PWM DAC
-   output [ 4-1: 0] dac_pwm_o          ,  // serial PWM DAC
 
    // XADC
    input  [ 5-1: 0] vinp_i             ,  // voltages p
@@ -151,14 +141,8 @@ module red_pitaya_top
    inout  [ 8-1: 0] exp_n_io           ,
 
 
-   // SATA connector
-   output [ 2-1: 0] daisy_p_o          ,  // line 1 is clock capable
-   output [ 2-1: 0] daisy_n_o          ,
-   input  [ 2-1: 0] daisy_p_i          ,  // line 1 is clock capable
-   input  [ 2-1: 0] daisy_n_i          ,
-
    // LED
-   output [ 8-1: 0] led_o       
+   output [ 8-1: 0] led_o
 
 );
 
@@ -185,7 +169,7 @@ wire  [ 32-1: 0] ps_sys_rdata       ;
 wire             ps_sys_err         ;
 wire             ps_sys_ack         ;
 
-  
+
 red_pitaya_ps i_ps
 (
  `ifdef TOOL_AHEAD
@@ -275,7 +259,7 @@ red_pitaya_ps i_ps
 
 //---------------------------------------------------------------------------------
 //
-//  Analog peripherials 
+//  Analog peripherials
 
 // ADC clock duty cycle stabilizer is enabled
 assign adc_cdcs_o = 1'b1 ;
@@ -291,19 +275,13 @@ wire             adc_clk     ;
 reg              adc_rstn    ;
 wire  [ 14-1: 0] adc_a       ;
 wire  [ 14-1: 0] adc_b       ;
-reg   [ 14-1: 0] dac_a       ;
-reg   [ 14-1: 0] dac_b       ;
-wire  [ 24-1: 0] dac_pwm_a   ;
-wire  [ 24-1: 0] dac_pwm_b   ;
-wire  [ 24-1: 0] dac_pwm_c   ;
-wire  [ 24-1: 0] dac_pwm_d   ;
 
 wire [ 12-1: 0] xadc_a      ;  // most recent value from slow ADCs
 wire [ 12-1: 0] xadc_b      ;
 
 wire xadc_a_strobe      ;  //asserted for 1 sys_clk when slow ADC values have been read
 wire xadc_b_strobe      ;
-   
+
 red_pitaya_analog i_analog
 (
   // ADC IC
@@ -311,32 +289,13 @@ red_pitaya_analog i_analog
   .adc_dat_b_i        (  adc_dat_b_i      ),  // CH 2
   .adc_clk_p_i        (  adc_clk_p_i      ),  // data clock
   .adc_clk_n_i        (  adc_clk_n_i      ),  // data clock
-  
-  // DAC IC
-  .dac_dat_o          (  dac_dat_o        ),  // combined data
-  .dac_wrt_o          (  dac_wrt_o        ),  // write enable
-  .dac_sel_o          (  dac_sel_o        ),  // channel select
-  .dac_clk_o          (  dac_clk_o        ),  // clock
-  .dac_rst_o          (  dac_rst_o        ),  // reset
-  
-  // PWM DAC
-  .dac_pwm_o          (  dac_pwm_o        ),  // serial PWM DAC
-  
-  
+
   // user interface
   .adc_dat_a_o        (  adc_a            ),  // ADC CH1
   .adc_dat_b_o        (  adc_b            ),  // ADC CH2
   .adc_clk_o          (  adc_clk          ),  // ADC received clock
   .adc_rst_i          (  adc_rstn         ),  // reset - active low
-  .ser_clk_o          (  ser_clk          ),  // fast serial clock
-  .dac_dat_a_i        (  dac_a            ),  // DAC CH1
-  .dac_dat_b_i        (  dac_b            ),  // DAC CH2
-
-  .dac_pwm_a_i        (  dac_pwm_a        ),  // slow DAC CH1
-  .dac_pwm_b_i        (  dac_pwm_b        ),  // slow DAC CH2
-  .dac_pwm_c_i        (  dac_pwm_c        ),  // slow DAC CH3
-  .dac_pwm_d_i        (  dac_pwm_d        ),  // slow DAC CH4
-  .dac_pwm_sync_o     (                   )   // slow DAC sync
+  .ser_clk_o          (  ser_clk          )   // fast serial clock
 );
 
 always @(posedge adc_clk) begin
@@ -370,8 +329,8 @@ reg   [     8-1: 0] sys_cs     ;
 always @(sys_addr) begin
    sys_cs = 8'h0 ;
    case (sys_addr[22:20])
-      3'h0, 3'h1, 3'h2, 3'h3, 3'h4, 3'h5, 3'h6, 3'h7 : 
-         sys_cs[sys_addr[22:20]] = 1'b1 ; 
+      3'h0, 3'h1, 3'h2, 3'h3, 3'h4, 3'h5, 3'h6, 3'h7 :
+         sys_cs[sys_addr[22:20]] = 1'b1 ;
    endcase
 end
 
@@ -383,28 +342,28 @@ assign ps_sys_rdata = {32{sys_cs[ 0]}} & sys_rdata[ 0*32+31: 0*32] |
                       {32{sys_cs[ 1]}} & sys_rdata[ 1*32+31: 1*32] |
                       {32{sys_cs[ 2]}} & sys_rdata[ 2*32+31: 2*32] |
                       {32{sys_cs[ 3]}} & sys_rdata[ 3*32+31: 3*32] |
-                      {32{sys_cs[ 4]}} & sys_rdata[ 4*32+31: 4*32] | 
+                      {32{sys_cs[ 4]}} & sys_rdata[ 4*32+31: 4*32] |
                       {32{sys_cs[ 5]}} & sys_rdata[ 5*32+31: 5*32] |
                       {32{sys_cs[ 6]}} & sys_rdata[ 6*32+31: 6*32] |
-                      {32{sys_cs[ 7]}} & sys_rdata[ 7*32+31: 7*32] ; 
+                      {32{sys_cs[ 7]}} & sys_rdata[ 7*32+31: 7*32] ;
 
 assign ps_sys_err   = sys_cs[ 0] & sys_err[  0] |
                       sys_cs[ 1] & sys_err[  1] |
                       sys_cs[ 2] & sys_err[  2] |
                       sys_cs[ 3] & sys_err[  3] |
-                      sys_cs[ 4] & sys_err[  4] | 
+                      sys_cs[ 4] & sys_err[  4] |
                       sys_cs[ 5] & sys_err[  5] |
                       sys_cs[ 6] & sys_err[  6] |
-                      sys_cs[ 7] & sys_err[  7] ; 
+                      sys_cs[ 7] & sys_err[  7] ;
 
 assign ps_sys_ack   = sys_cs[ 0] & sys_ack[  0] |
                       sys_cs[ 1] & sys_ack[  1] |
                       sys_cs[ 2] & sys_ack[  2] |
                       sys_cs[ 3] & sys_ack[  3] |
-                      sys_cs[ 4] & sys_ack[  4] | 
+                      sys_cs[ 4] & sys_ack[  4] |
                       sys_cs[ 5] & sys_ack[  5] |
                       sys_cs[ 6] & sys_ack[  6] |
-                      sys_cs[ 7] & sys_ack[  7] ; 
+                      sys_cs[ 7] & sys_ack[  7] ;
 
 
 // assign sys_rdata[ 6*32+31: 6*32] = 32'h0;
@@ -483,9 +442,9 @@ wire radar_trig ;
 wire acp_trig ;
 wire arp_trig ;
 wire adc_ready ;
-   
-   
-   
+
+
+
 red_pitaya_scope i_scope
 (
   // ADC
@@ -498,7 +457,7 @@ red_pitaya_scope i_scope
   .radar_trig_i    (  radar_trig                 ),  // radar trigger (possibly delayed trigger from channel B)
   .acp_trig_i      (  acp_trig                   ),  // acp trigger (slow ADC A)
   .arp_trig_i      (  arp_trig                   ),  // arp trigger (slow ADC B)
- 
+
   .xadc_a          (  xadc_a                     ),  // slow channel 1
   .xadc_b          (  xadc_b                     ),  // slow channel 2
 
@@ -516,112 +475,6 @@ red_pitaya_scope i_scope
   .sys_err_o       (  sys_err[1]                 ),  // error indicator
   .sys_ack_o       (  sys_ack[1]                 )   // acknowledge signal
 );
-
-
-
-
-
-
-
-
-//---------------------------------------------------------------------------------
-//
-//  DAC arbitrary signal generator
-
-wire  [ 14-1: 0] asg_a       ;
-wire  [ 14-1: 0] asg_b       ;
-
-red_pitaya_asg i_asg
-(
-   // DAC
-  .dac_a_o         (  asg_a                      ),  // CH 1
-  .dac_b_o         (  asg_b                      ),  // CH 2
-  .dac_clk_i       (  adc_clk                    ),  // clock
-  .dac_rstn_i      (  adc_rstn                   ),  // reset - active low
-  .trig_a_i        (  exp_p_in[0]                ),
-  .trig_b_i        (  exp_p_in[0]                ),
-  .trig_out_o      (  trig_asg_out               ),
-
-  // System bus
-  .sys_clk_i       (  sys_clk                    ),  // clock
-  .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
-  .sys_addr_i      (  sys_addr                   ),  // address
-  .sys_wdata_i     (  sys_wdata                  ),  // write data
-  .sys_sel_i       (  sys_sel                    ),  // write byte select
-  .sys_wen_i       (  sys_wen[2]                 ),  // write enable
-  .sys_ren_i       (  sys_ren[2]                 ),  // read enable
-  .sys_rdata_o     (  sys_rdata[ 2*32+31: 2*32]  ),  // read data
-  .sys_err_o       (  sys_err[2]                 ),  // error indicator
-  .sys_ack_o       (  sys_ack[2]                 )   // acknowledge signal
-);
-
-
-
-
-
-
-
-
-//---------------------------------------------------------------------------------
-//
-//  MIMO PID controller
-
-wire  [ 14-1: 0] pid_a       ;
-wire  [ 14-1: 0] pid_b       ;
-
-red_pitaya_pid i_pid
-(
-   // signals
-  .clk_i           (  adc_clk                    ),  // clock
-  .rstn_i          (  adc_rstn                   ),  // reset - active low
-  .dat_a_i         (  adc_a                      ),  // in 1
-  .dat_b_i         (  adc_b                      ),  // in 2
-  .dat_a_o         (  pid_a                      ),  // out 1
-  .dat_b_o         (  pid_b                      ),  // out 2
-
-  // System bus
-  .sys_clk_i       (  sys_clk                    ),  // clock
-  .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
-  .sys_addr_i      (  sys_addr                   ),  // address
-  .sys_wdata_i     (  sys_wdata                  ),  // write data
-  .sys_sel_i       (  sys_sel                    ),  // write byte select
-  .sys_wen_i       (  sys_wen[3]                 ),  // write enable
-  .sys_ren_i       (  sys_ren[3]                 ),  // read enable
-  .sys_rdata_o     (  sys_rdata[ 3*32+31: 3*32]  ),  // read data
-  .sys_err_o       (  sys_err[3]                 ),  // error indicator
-  .sys_ack_o       (  sys_ack[3]                 )   // acknowledge signal
-);
-
-
-
-
-//---------------------------------------------------------------------------------
-//
-//  Sumation of ASG and PID signal
-//  perform saturation before sending to DAC 
-
-wire  [ 15-1: 0] dac_a_sum       ;
-wire  [ 15-1: 0] dac_b_sum       ;
-
-assign dac_a_sum = $signed(asg_a) + $signed(pid_a);
-assign dac_b_sum = $signed(asg_b) + $signed(pid_b);
-
-always @(*) begin
-   if (dac_a_sum[15-1:15-2] == 2'b01) // pos. overflow
-      dac_a <= 14'h1FFF ;
-   else if (dac_a_sum[15-1:15-2] == 2'b10) // neg. overflow
-      dac_a <= 14'h2000 ;
-   else
-      dac_a <= dac_a_sum[14-1:0] ;
-
-
-   if (dac_b_sum[15-1:15-2] == 2'b01) // pos. overflow
-      dac_b <= 14'h1FFF ;
-   else if (dac_b_sum[15-1:15-2] == 2'b10) // neg. overflow
-      dac_b <= 14'h2000 ;
-   else
-      dac_b <= dac_b_sum[14-1:0] ;
-end
 
 
 
@@ -651,7 +504,7 @@ red_pitaya_ams i_ams
   .dac_c_o         (  dac_pwm_c                  ),
   .dac_d_o         (  dac_pwm_d                  ),
 
- 
+
   .xadc_a_o        (  xadc_a                     ),  // latest value from slow ADC a
   .xadc_b_o        (  xadc_b                     ),  // latest value from slow ADC b
 
@@ -679,53 +532,6 @@ red_pitaya_ams i_ams
 
 
 
-//---------------------------------------------------------------------------------
-//
-//  Daisy chain
-//  simple communication module
-
-wire daisy_rx_rdy ;
-wire dly_clk = fclk[3]; // 200MHz clock from PS - used for IDELAY (optionaly)
-
-red_pitaya_daisy i_daisy
-(
-   // SATA connector
-  .daisy_p_o       (  daisy_p_o                  ),  // line 1 is clock capable
-  .daisy_n_o       (  daisy_n_o                  ),
-  .daisy_p_i       (  daisy_p_i                  ),  // line 1 is clock capable
-  .daisy_n_i       (  daisy_n_i                  ),
-
-   // Data
-  .ser_clk_i       (  ser_clk                    ),  // high speed serial
-  .dly_clk_i       (  dly_clk                    ),  // delay clock
-   // TX
-  .par_clk_i       (  adc_clk                    ),  // data paralel clock
-  .par_rstn_i      (  adc_rstn                   ),  // reset - active low
-  .par_rdy_o       (  daisy_rx_rdy               ),
-  .par_dv_i        (  daisy_rx_rdy               ),
-  .par_dat_i       (  16'h1234                   ),
-   // RX
-  .par_clk_o       (                             ),
-  .par_rstn_o      (                             ),
-  .par_dv_o        (                             ),
-  .par_dat_o       (                             ),
-
-  .debug_o         (/*led_o*/                    ),
-
-   // System bus
-  .sys_clk_i       (  sys_clk                    ),  // clock
-  .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
-  .sys_addr_i      (  sys_addr                   ),  // address
-  .sys_wdata_i     (  sys_wdata                  ),  // write data
-  .sys_sel_i       (  sys_sel                    ),  // write byte select
-  .sys_wen_i       (  sys_wen[5]                 ),  // write enable
-  .sys_ren_i       (  sys_ren[5]                 ),  // read enable
-  .sys_rdata_o     (  sys_rdata[ 5*32+31: 5*32]  ),  // read data
-  .sys_err_o       (  sys_err[5]                 ),  // error indicator
-  .sys_ack_o       (  sys_ack[5]                 )   // acknowledge signal
-);
-
-
 red_pitaya_digdar i_digdar
 (
   .adc_clk_i       (  adc_clk                    ),  // clock
@@ -742,7 +548,7 @@ red_pitaya_digdar i_digdar
 
   .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
   .acp_trig_o      (  acp_trig                   ),  // acp trigger
-  .arp_trig_o      (  arp_trig                   ),  // arp trigger 
+  .arp_trig_o      (  arp_trig                   ),  // arp trigger
    // System bus
   .sys_clk_i       (  sys_clk                    ),  // clock
   .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -783,9 +589,8 @@ red_pitaya_test i_test
   .sys_ack_o       (  sys_ack[7]                 )   // acknowledge signal
 );
 
-//assign sys_rdata[ 7*32+31: 7*32] = 32'h0 ; 
+//assign sys_rdata[ 7*32+31: 7*32] = 32'h0 ;
 //assign sys_err[7] = 1'b0 ;
 //assign sys_ack[7] = 1'b1 ;
 
 endmodule
-

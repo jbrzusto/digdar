@@ -74,8 +74,9 @@ all: $(TARGET)
 
 # Makefile target with rules how to link executable for each target from $(TARGET)
 # list.
-capture_db.o: capture_db.h capture_db.cc
-	$(CPP) $(CPPOPTS) -o $@ -c capture_db.cc
+
+rpcapture.o: rpcapture.cc sweep_file_writer.h pulse_metadata.h shared_ring_buffer.h
+	g++ $(CPPOPTS) -o $@ -c rpcapture.cc
 
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)

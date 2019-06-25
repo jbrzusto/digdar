@@ -5,9 +5,9 @@
  *
  * @Author Jure Menart <juremenart@gmail.com>
  * @Author John Brzustowski <jbrzusto@fastmail.fm>
- *         
+ *
  * (c) Red Pitaya  http://www.redpitaya.com
- * (c) 2014 John Brzustowski 
+ * (c) 2014 John Brzustowski
  *
  * This part of code is written in C programming language.
  * Please visit http://en.wikipedia.org/wiki/C_(programming_language)
@@ -81,7 +81,7 @@
 #define OFFSET_SAVED_ARP_CLOCK_HIGH       0x00098 // (saved) clock at most recent ARP (high 32 bits)
 #define OFFSET_SAVED_ARP_PREV_CLOCK_LOW   0x0009C // (saved) clock at previous ARP (low 32 bits)
 #define OFFSET_SAVED_ARP_PREV_CLOCK_HIGH  0x000A0 // (saved) clock at previous ARP (high 32 bits)
-#define OFFSET_SAVED_ACP_PER_ARP          0x000A4 // (saved) count of ACP pulses between two most recent ARP pulses                                  
+#define OFFSET_SAVED_ACP_PER_ARP          0x000A4 // (saved) count of ACP pulses between two most recent ARP pulses
 #define OFFSET_ACP_AT_ARP                 0x000B8 // most recent ACP count at ARP pulse
 #define OFFSET_SAVED_ACP_AT_ARP           0x000BC // (saved) most recent ACP count at ARP pulse
 
@@ -100,7 +100,7 @@ typedef struct osc_fpga_reg_mem_s {
     /** @brief  Configuration:
      * bit     [0] - arm_trigger
      * bit     [1] - rst_wr_state_machine
-     * bits [31:2] - reserved 
+     * bits [31:2] - reserved
      */
     uint32_t conf;
 
@@ -109,10 +109,10 @@ typedef struct osc_fpga_reg_mem_s {
      *   1 - trig immediately
      *   2 - ChA positive edge
      *   3 - ChA negative edge
-     *   4 - ChB positive edge 
+     *   4 - ChB positive edge
      *   5 - ChB negative edge
      *   6 - External trigger 0
-     *   7 - External trigger 1 
+     *   7 - External trigger 1
      *   8 - ASG positive edge
      *   9 - ASG negative edge
      *  10 - digdar counted trigger pulse
@@ -135,7 +135,7 @@ typedef struct osc_fpga_reg_mem_s {
     uint32_t chb_thr;
 
     /** @brief  After trigger delay:
-     * bits [31: 0] - trigger delay 
+     * bits [31: 0] - trigger delay
      * 32 bit number - how many decimated samples should be stored into a buffer.
      * (max 16k samples)
      */
@@ -144,7 +144,7 @@ typedef struct osc_fpga_reg_mem_s {
     /** @brief  Data decimation
      * bits [16: 0] - decimation factor, legal values:
      *   1, 2, 8, 64, 1024, 8192 65536
-     *   If other values are written data is undefined 
+     *   If other values are written data is undefined
      * bits [31:17] - reserved
      */
     uint32_t data_dec;
@@ -153,7 +153,7 @@ typedef struct osc_fpga_reg_mem_s {
      * bits [13: 0] - pointer
      * bits [31:14] - reserved
      * Current pointer - where machine stopped writing after trigger
-     * Trigger pointer - where trigger was detected 
+     * Trigger pointer - where trigger was detected
      */
     uint32_t wr_ptr_cur;
     uint32_t wr_ptr_trigger;
@@ -170,59 +170,59 @@ typedef struct osc_fpga_reg_mem_s {
      * bits [31:1] - reserved
      */
     uint32_t other;
-    
+
     uint32_t reseved;
-    
+
     /** @brief ChA Equalization filter
      * bits [17:0] - AA coefficient (pole)
      * bits [31:18] - reserved
      */
-    uint32_t cha_filt_aa;    
-    
+    uint32_t cha_filt_aa;
+
     /** @brief ChA Equalization filter
      * bits [24:0] - BB coefficient (zero)
      * bits [31:25] - reserved
      */
-    uint32_t cha_filt_bb;    
-    
+    uint32_t cha_filt_bb;
+
     /** @brief ChA Equalization filter
      * bits [24:0] - KK coefficient (gain)
      * bits [31:25] - reserved
      */
-    uint32_t cha_filt_kk;  
-    
+    uint32_t cha_filt_kk;
+
     /** @brief ChA Equalization filter
      * bits [24:0] - PP coefficient (pole)
      * bits [31:25] - reserved
      */
-    uint32_t cha_filt_pp;     
-    
-    
-    
+    uint32_t cha_filt_pp;
+
+
+
 
     /** @brief ChB Equalization filter
      * bits [17:0] - AA coefficient (pole)
      * bits [31:18] - reserved
      */
-    uint32_t chb_filt_aa;    
-    
+    uint32_t chb_filt_aa;
+
     /** @brief ChB Equalization filter
      * bits [24:0] - BB coefficient (zero)
      * bits [31:25] - reserved
      */
-    uint32_t chb_filt_bb;    
-    
+    uint32_t chb_filt_bb;
+
     /** @brief ChB Equalization filter
      * bits [24:0] - KK coefficient (gain)
      * bits [31:25] - reserved
      */
-    uint32_t chb_filt_kk;  
-    
+    uint32_t chb_filt_kk;
+
     /** @brief ChB Equalization filter
      * bits [24:0] - PP coefficient (pole)
      * bits [31:25] - reserved
      */
-    uint32_t chb_filt_pp;            
+    uint32_t chb_filt_pp;
 
     /** @brief Extra options:
      * bit [0] - if 1, only record samples after trigger detected
@@ -230,7 +230,7 @@ typedef struct osc_fpga_reg_mem_s {
      *            we can be reading it from BRAM into DRAM while the FPGA
      *            waits for and digitizes another pulse. (Provided the number
      *            of samples to be digitized is <= 1/2 the buffer size of 16 k samples)
-     * bit [1] - if 1, ADC A negates values and returns in 2s complement; otherwise, 
+     * bit [1] - if 1, ADC A negates values and returns in 2s complement; otherwise,
      *           values are returned as-is.
      * bit [2] - use 32-bit reads from buffers
      * bit [3] - use counting mode, not real ADC samples; for debugging only
@@ -238,7 +238,7 @@ typedef struct osc_fpga_reg_mem_s {
      * bits [31:2] - reserved
      */
     uint32_t digdar_extra_options;
-  
+
     /** @brief  ChA & ChB data - 14 LSB bits valid starts from 0x10000 and
      * 0x20000 and are each 16k samples long */
 } osc_fpga_reg_mem_t;
@@ -249,7 +249,7 @@ typedef struct digdar_fpga_reg_mem_s {
 
     /** @brief  trig_thresh_excite: trigger excitation threshold
      *          Trigger is raised for one FPGA clock after trigger channel
-     *          ADC value meets or exceeds this value (in direction away 
+     *          ADC value meets or exceeds this value (in direction away
      *          from trig_thresh_relax).
      * bits [13: 0] - threshold, signed
      * bit  [31:14] - reserved
@@ -258,7 +258,7 @@ typedef struct digdar_fpga_reg_mem_s {
 
     /** @brief  trig_thresh_relax: trigger relaxation threshold
      *          After a trigger has been raised, the trigger channel ADC value
-     *          must meet or exceeds this value (in direction away 
+     *          must meet or exceeds this value (in direction away
      *          from trig_thresh_excite) before a trigger will be raised again.
      *          (Serves to debounce signal in schmitt-trigger style).
      * bits [13: 0] - threshold, signed
@@ -270,7 +270,7 @@ typedef struct digdar_fpga_reg_mem_s {
      *          How long to wait after trigger is raised
      *          before starting to capture samples from Video channel.
      *          Note: this usage of 'delay' is traditional for radar digitizing
-     *          but differs from the red pitaya scope usage, which means 
+     *          but differs from the red pitaya scope usage, which means
      *          "number of decimated ADC samples to acquire after trigger is raised"
      * bits [31: 0] - unsigned wait time, in ADC clocks.
      */
@@ -324,7 +324,7 @@ typedef struct digdar_fpga_reg_mem_s {
 
     /** @brief  acp_thresh_relax: acp relaxation threshold
      *          After an acp has been detected, the acp channel ADC value
-     *          must meet or exceeds this value (in direction away 
+     *          must meet or exceeds this value (in direction away
      *          from acp_thresh_excite) before a acp will be detected again.
      *          (Serves to debounce signal in schmitt-acp style).
      * bits [11: 0] - threshold, signed
@@ -380,7 +380,7 @@ typedef struct digdar_fpga_reg_mem_s {
 
     /** @brief  arp_thresh_relax: arp relaxation threshold
      *          After an arp has been detected, the arp channel ADC value
-     *          must meet or exceeds this value (in direction away 
+     *          must meet or exceeds this value (in direction away
      *          from arp_thresh_excite) before a arp will be detected again.
      *          (Serves to debounce signal in schmitt-arp style).
      * bits [11: 0] - threshold, signed
@@ -503,15 +503,15 @@ typedef struct digdar_fpga_reg_mem_s {
     /** @brief  clocks: 64-bit count of ADC clock ticks since reset
      */
   uint64_t clocks;
-  
+
   /** @brief  most recent slow ADC value from ACP
      */
-  
-  uint32_t acp_raw; 
+
+  uint32_t acp_raw;
   /** @brief  most recent slow ADC value from ARP
      */
 
-  uint32_t arp_raw; 
+  uint32_t arp_raw;
 
     /** @brief  acp_at_arp:  value of acp count at most recent arp pulse
      */
@@ -551,10 +551,6 @@ typedef struct {
 /* function declarations, detailed descriptions is in apparent implementation file  */
 int   osc_fpga_init(void);
 int   osc_fpga_exit(void);
-int osc_fpga_update_params(int trig_imm, int trig_source, int trig_edge, 
-                           float trig_delay, float trig_level, int decim_factor,
-                           int equal, int shaping, int gain1, int gain2);
-int   osc_fpga_reset(void);
 int   osc_fpga_arm_trigger(void);
 int   osc_fpga_set_trigger(uint32_t trig_source);
 int   osc_fpga_set_trigger_delay(uint32_t trig_delay);
@@ -563,21 +559,6 @@ int   osc_fpga_triggered(void);
 int   osc_fpga_get_sig_ptr(int **cha_signal, int **chb_signal, int **xcha_signal, int **xchb_signal);
 int   osc_fpga_get_wr_ptr(int *wr_ptr_curr, int *wr_ptr_trig);
 
-int   osc_fpga_cnv_trig_source(int trig_imm, int trig_source, int trig_edge);
-int   osc_fpga_cnv_time_to_smpls(float time, int dec_factor);
-/* int   osc_fpga_cnv_v_to_cnt(float voltage, float max_adc_v, */
-/*                             int calib_dc_off, float user_dc_off); */
-/* float osc_fpga_cnv_cnt_to_v(int cnts, float max_adc_v, */
-/*                             int calib_dc_off, float user_dc_off); */
-
-/* Converts voltage in [V] to ADC counts */
-int osc_fpga_cnv_v_to_cnt(float voltage);
-/* Converts ADC ounts to [V] */
-float osc_fpga_cnv_cnt_to_v(int cnts);
-
-
-float osc_fpga_cnv_xcnt_to_v(int cnts);
-float osc_fpga_cnv_cnt_to_rel(int cnts, int bits);
 
 float osc_fpga_calc_adc_max_v(uint32_t fe_gain_fs, int probe_att);
 

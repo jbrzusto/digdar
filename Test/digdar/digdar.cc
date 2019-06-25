@@ -88,7 +88,7 @@ void usage() {
     "          e.g. instead of returning (x[0]+x[1])/2 at decimation rate 2, return x[0]+x[1]\n"
     "          Only valid if the decimation rate is <= 4 so that the sum fits in 16 bits\n"
     "  --samples   -n SAMPLES   Samples per pulse. (Up to 16384; default is 3000)\n"
-    "  --pulses -p PULSES Number of pulses to allocate buffer for (default, 1000)\n"
+    "  --pulses -p PULSES Number of pulses to allocate buffer for (default; number that fit in 150MB of RAM)\n"
     "  --param_file -P FILE File of name value pairs for digitizer fpga parameters\n"
     "  --remove -r START:END  Remove sector.  START and END are portions of the circle in [0, 1]\n"
     "                         where 0 is the start of the ARP pulse, and 1 is the start of the next ARP\n"
@@ -96,7 +96,6 @@ void usage() {
     "                         If START > END, the removed sector consists of [START, 1] U [0, END].\n"
     "                         Multiple --remove options may be given.\n"
     "           NOTE: this option must come *after* --acps, if that option is given.\n"
-    "  --chunk_size -c Number of pulses to transfer in each chunk\n"
     "  --tcp HOST:PORT instead of writing to stdout, open a TCP socket connection to PORT on HOST and\n"
     "                  write there.\n"
     "  --version       -v    Print version info.\n"
@@ -189,10 +188,8 @@ uint16_t num_removals = 0;
 
 uint16_t n_samples = 3000;  // samples to grab per radar pulse
 uint32_t decim = 1; // decimation: 1, 2, 8, etc.
-uint16_t num_pulses = 1000; // pulses to maintain in ring buffer (filled by worker thread)
-uint16_t chunk_size = 10; // pulses to transmit per chunk (main thread)
-uint16_t num_chunks = 0; // maximum number of pulses per chunk
-uint16_t *pulses_in_chunk = 0; // number of pulses actually in each chunk
+uint32_t max_pulse_buffer_memory = 150000000; // 150Mb pulse buffer memory
+uint32_t pulse_buff_size = 0; // number of pulses to maintain in ring buffer (filled by worker thread); default 0 means as many as fit in max memory
 uint32_t psize = 0; // actual size of each pulse's storage (metadata + data) - will be set below
 uint16_t use_sum = 0; // if non-zero, return sum of samples rather than truncated average
 uint16_t acps = 450; // number of ACPs per sweep; used in calculating removal
@@ -237,14 +234,13 @@ int main(int argc, char *argv[])
     {"sum",      no_argument,       0, 's'},
     {"pulses",       required_argument,       0, 'p'},
     {"param_file",   required_argument,       0, 'P'},
-    {"chunk_size",    required_argument,          0, 'c'},
     {"remove",    required_argument,          0, 'r'},
     {"tcp",    required_argument,          0, 't'},
     {"version",      no_argument,       0, 'v'},
     {"help",         no_argument,       0, 'h'},
     {0, 0, 0, 0}
   };
-  const char *optstring = "aC:c:d:Dhn:p:P:r:st:v";
+  const char *optstring = "aC:d:Dhn:p:P:r:st:v";
 
   /* getopt_long stores the option index here. */
   int option_index = 0;
@@ -258,10 +254,6 @@ int main(int argc, char *argv[])
 
     case 'C':
       cut = atof(optarg) * acps;
-      break;
-
-    case 'c':
-      chunk_size = atoi(optarg);
       break;
 
     case 'd':
@@ -282,7 +274,7 @@ int main(int argc, char *argv[])
       break;
 
     case 'p':
-      num_pulses = atoi(optarg);
+      pulse_buff_size = atoi(optarg);
       break;
 
     case 'P':
@@ -440,40 +432,32 @@ int main(int argc, char *argv[])
 
   /* Setting of parameters in Oscilloscope main module */
 
-  // FIXME: load digdar params from JSON file, parse, and set
-
   if(rp_set_params((float *)&t_params, PARAMS_NUM) < 0) {
     fprintf(stderr, "rp_set_params() failed!\n");
     return -1;
   }
 
+  /* storage for one pulse, in bytes */
   psize = sizeof(pulse_metadata) + sizeof(uint16_t) * (n_samples - 1);
 
-  pulse_buffer = (pulse_metadata *) calloc(num_pulses, psize);
+  /* maximum number of pulses allowed for pulse buffer */
+  uint32_t max_pulses = max_pulse_buffer_memory / psize;
+  if (pulse_buff_size == 0 || pulse_buff_size > max_pulses)
+    pulse_buff_size = max_pulses;
+
+
+  pulse_buffer = (pulse_metadata *) calloc(pulse_buff_size, psize);
   if (!pulse_buffer) {
     fprintf(stderr, "couldn't allocate pulse buffer\n");
     return -1;
   }
 
-  num_chunks = num_pulses / chunk_size;
-
-  pulses_in_chunk = (uint16_t *) calloc(num_chunks, sizeof(uint16_t));
-
-  // fill in magic number in pulse headers
-
-  for (int i = 0; i < num_pulses; ++i) {
-    pulse_metadata *pbm = (pulse_metadata *) (((char *) pulse_buffer) + i * psize);
-    pbm->magic_number = PULSE_METADATA_MAGIC;
-  }
-
-  //    rp_osc_worker_init();
-
-  // go ahead and start capturing
+  // start worker thread which captures to pulse buffer
 
   rp_osc_worker_change_state(rp_osc_start_state);
 
-  uint16_t cur_pulse; // index of first chunk pulse in ring buffer
-  uint16_t num_pulses; // number of pulses availabe in chunk
+  uint32_t cur_pulse = 0; // index of first chunk pulse in ring buffer
+  uint32_t num_pulses = 0; // number of pulses availabe in ring buffer (maxes out to max_pulses)
 
   /* Continuous thread loop (exited only with 'quit' state) */
   while(1) {

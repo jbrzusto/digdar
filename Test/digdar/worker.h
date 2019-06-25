@@ -52,26 +52,12 @@ typedef enum rp_osc_worker_state_e {
 int rp_osc_worker_init(void);
 int rp_osc_worker_exit(void);
 int rp_osc_worker_change_state(rp_osc_worker_state_t new_state);
-int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update);
-
-/* Returns:
- *  0 - no pulse captured
- *  1 - pulse captured
- */
-
-int rp_osc_get_pulse(pulse_metadata * pm, uint16_t ns, uint16_t *data, uint32_t timeout);
-
-int rp_osc_get_chunk_for_reader(uint16_t * cur_pulse, uint16_t * num_pulses);
-int16_t rp_osc_get_chunk_index_for_writer();
 
 extern uint16_t n_samples;  // samples to grab per radar pulse
 extern uint32_t decim; // decimation: 1, 2, or 8
 extern uint16_t num_pulses; // pulses to maintain in ring buffer (filled by worker thread)
-extern uint16_t chunk_size; // pulses to transmit per chunk (main thread)
-extern uint16_t num_chunks; // number of chunks in ring buffer
-extern uint16_t *pulses_in_chunk; // number of pulses in each buffer chunk
-  extern uint32_t psize; // size of each pulse's storage
-  extern uint16_t acps; // acp pulses per sweep as specified by user
+extern uint32_t psize; // size of each pulse's storage
+extern uint16_t acps; // acp pulses per sweep as specified by user
 
 typedef struct {
   uint16_t begin;
@@ -83,7 +69,7 @@ extern sector removals[MAX_REMOVALS];
 extern uint16_t num_removals;
 
 extern pulse_metadata *pulse_buffer;
-
+extern uint32_t pulse_buff_size;
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

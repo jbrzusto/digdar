@@ -176,28 +176,6 @@ int rp_osc_worker_change_state(rp_osc_worker_state_t new_state)
     return 0;
 }
 
-/** @brief Updates the worker copy of the parameters
- *
- * This function is used to update the parameters in worker. These parameters are
- * not effective immediately. They will be used by worker thread loop after
- * current operation is finished.
- *
- * @param [in] params New parameters
- * @param [in] fpga_update Flag is FPGA needs to be updated.
- *
- * @retval 0 Always returns 0
- **/
-int rp_osc_worker_update_params(rp_osc_params_t *params, int fpga_update)
-{
-    pthread_mutex_lock(&rp_osc_ctrl_mutex);
-    memcpy(&rp_osc_params, params, sizeof(rp_osc_params_t)*PARAMS_NUM);
-    rp_osc_params_dirty       = 1;
-    rp_osc_params_fpga_update = fpga_update;
-    pthread_mutex_unlock(&rp_osc_ctrl_mutex);
-    return 0;
-}
-
-
 static int16_t reader_chunk_index = -1; // which chunk is currently being read by the export thread
 static int16_t writer_chunk_index = 0;  // which chunk is currently being written by the capture thread
 
