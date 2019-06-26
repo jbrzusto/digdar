@@ -375,28 +375,4 @@ always @(*) begin
    endcase
 end
 
-bus_clk_bridge i_bridge
-(
-   .sys_clk_i     (  sys_clk_i      ),
-   .sys_rstn_i    (  sys_rstn_i     ),
-   .sys_addr_i    (  sys_addr_i     ),
-   .sys_wdata_i   (  sys_wdata_i    ),
-   .sys_sel_i     (  sys_sel_i      ),
-   .sys_wen_i     (  sys_wen_i      ),
-   .sys_ren_i     (  sys_ren_i      ),
-   .sys_rdata_o   (  sys_rdata_o    ),
-   .sys_err_o     (  sys_err_o      ),
-   .sys_ack_o     (  sys_ack_o      ),
-
-   .clk_i         (  adc_clk_i      ),
-   .rstn_i        (  adc_rstn_i     ),
-   .addr_o        (  addr           ),
-   .wdata_o       (  wdata          ),
-   .wen_o         (  wen            ),
-   .ren_o         (  ren            ),
-   .rdata_i       (  rdata          ),
-   .err_i         (  err            ),
-   .ack_i         (  ack            )
-);
-
 endmodule // red_pitaya_digdar
