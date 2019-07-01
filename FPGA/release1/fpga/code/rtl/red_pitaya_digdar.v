@@ -293,7 +293,7 @@ reg             ack          ;
          trig_prev_clock      <= trig_clock;
       end
 
-      if (radar_trig_o) begin // NOTE: using & adc_ready_i causes timing violations
+      if (radar_trig_o & adc_ready_i) begin // NOTE: using & adc_ready_i causes timing violations
          // we've been triggered and ADC is ready to write data to buffer
          // save copies of metadata registers for this pulse.  We require
          // adc_ready_i so that we don't overwrite the saved metadata registers

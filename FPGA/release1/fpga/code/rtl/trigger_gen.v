@@ -33,7 +33,7 @@
  * the clock pulse N+1+delay.
  *
  * Each trigger is held high for one clock.
- * 
+ *
  */
 
 // mode of triggering depends on ordering of relax and excite thresholds:
@@ -48,7 +48,7 @@
 `define STATE_WAITING_EXCITE    2'd1  // waiting for signal to cross threshold in excitation direction
 `define STATE_DELAYING          2'd2  // threshold crossed; delaying before triggering
 
-module trigger_gen 
+module trigger_gen
   ( input clock,
     input                          reset,
     input                          enable,
@@ -61,13 +61,13 @@ module trigger_gen
     output reg                     trigger,
     output reg [counter_width-1:0] counter
     );
-   
+
    parameter width         = 12;
    parameter delay_width   = 32;
    parameter counter_width = 32;
    parameter age_width     = 32;
    parameter do_smoothing  = 1;
-   
+
    reg [2-1:0] 			   state;           // one of STATE values above
    reg [width-1:0] 		   sig_smoothed;    // possibly smoothed version of signal_in
    reg [age_width-1:0]             age;             // number of clock ticks since assertion of trigger
@@ -76,8 +76,8 @@ module trigger_gen
 
    wire                            excited;         // true when smoothed signal is at or beyond excitation threshold, away from relaxation
    wire                            relaxed;         // true when smoothed signal is at or beyond relaxation threshold, away from excitation
-   
-    
+
+
    reg [width + 3 - 1: 0]          smoother;
 
    always @(posedge clock)
@@ -100,13 +100,13 @@ module trigger_gen
    assign relaxed = ((mode == `MODE_NORMAL)       && $signed(sig_smoothed) <= $signed(thresh_relax)) ||
                     ((mode == `MODE_INVERTED)     && $signed(sig_smoothed) >= $signed(thresh_relax)) ||
                     ((mode == `MODE_NOHYSTERESIS) && $signed(sig_smoothed) <  $signed(thresh_relax));
-   
-   always @(posedge clock)       
+
+   always @(posedge clock)
      if (reset | ~enable)
        begin
           state <= `STATE_WAITING_EXCITE;
-	  trigger <=  #1 1'b0;
-	  counter <= #1 1'b0;
+	  trigger <=  1'b0;
+	  counter <= 1'b0;
 	  sig_smoothed <=  signal_in;
           smoother <= {signal_in, 3'b0};
 	  age <=  latency;  // so that we don't wait for latency before the very first trigger
@@ -128,13 +128,13 @@ module trigger_gen
 	       case (state)
 	         `STATE_WAITING_RELAX:
 	           begin
-		      trigger <=  #1 1'b0;
+		      trigger <=  1'b0;
 		      if (relaxed)
 		        begin
 		           state <=  `STATE_WAITING_EXCITE;
 		        end
 	           end
-                 
+
 	         `STATE_WAITING_EXCITE:
 	           begin
                       if (excited & age >= latency)
@@ -143,8 +143,8 @@ module trigger_gen
 		           if (delay == 0)
 			     begin
 			        state <=  `STATE_WAITING_RELAX;
-			        trigger <= #1 1'b1;
-		                counter <= #1 counter + 1'b1;
+			        trigger <= 1'b1;
+		                counter <= counter + 1'b1;
 			     end
 		           else
 			     begin
@@ -152,13 +152,13 @@ module trigger_gen
 			     end
 		        end
                    end
-	         
+
 	         `STATE_DELAYING:
                    if (age >= delay)
                      begin
 		        state <=  `STATE_WAITING_RELAX;
-		        trigger <=  #1 1'b1;
-		        counter <= #1 counter + 1'b1;
+		        trigger <=  1'b1;
+		        counter <= counter + 1'b1;
 		     end
                endcase // case (state)
             end // if (strobe)

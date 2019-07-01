@@ -18,19 +18,19 @@
  If so, then the counting logic is broken and we're writing one pair fewer
  of samples to the buffer than we should be, but we're also starting
  one pair of samples too early and this line (326):
- 
+
           adc_wp_trig <= adc_wp - 1'b1 ; // save write pointer at trigger arrival
 
  should be replaced with:
 
           adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
  */
- 
+
 
 /**
  * GENERAL DESCRIPTION:
  *
- * This is simple data aquisition module, primerly used for scilloscope 
+ * This is simple data aquisition module, primerly used for scilloscope
  * application. It consists from three main parts.
  *
  *
@@ -44,21 +44,21 @@
  *                                                  ^         ˇ
  *                /--------\      /-----------\     |      /-----\
  *   ADC CHB ---> | DFILT1 | ---> | AVG & DEC | ---------> | BUF | --->  SW
- *                \--------/      \-----------/            \-----/ 
+ *                \--------/      \-----------/            \-----/
  *
  *
  * Input data is optionaly averaged and decimated via average filter.
  *
- * Trigger section makes triggers from input ADC data or external digital 
+ * Trigger section makes triggers from input ADC data or external digital
  * signal. To make trigger from analog signal schmitt trigger is used, external
  * trigger goes first over debouncer, which is separate for pos. and neg. edge.
  *
- * Data capture buffer is realized with BRAM. Writing into ram is done with 
+ * Data capture buffer is realized with BRAM. Writing into ram is done with
  * arm/trig logic. With adc_arm_do signal (SW) writing is enabled, this is active
  * until trigger arrives and adc_dly_cnt counts to zero. Value adc_wp_trig
  * serves as pointer which shows when trigger arrived. This is used to show
  * pre-trigger data.
- * 
+ *
  */
 
 
@@ -73,7 +73,7 @@ module red_pitaya_scope
    input                 trig_ext_i      ,  //!< external trigger
    input                 trig_asg_i      ,  //!< ASG trigger
 
-   input      [ 12-1: 0] xadc_a          ,  //!< latest value from slow ADC 0  
+   input      [ 12-1: 0] xadc_a          ,  //!< latest value from slow ADC 0
    input      [ 12-1: 0] xadc_b          ,  //!< latest value from slow ADC 1
 
    input                 radar_trig_i    ,  //!< true for one cycle at start of radar trigger pulse
@@ -93,7 +93,7 @@ module red_pitaya_scope
    output                sys_err_o       ,  //!< bus error indicator
    output                sys_ack_o          //!< bus acknowledge signal
 );
-   
+
 wire [ 32-1: 0] addr         ;
 wire [ 32-1: 0] wdata        ;
 wire            wen          ;
@@ -107,7 +107,7 @@ reg [32-1:0] digdar_extra_options;
 reg [ 32-1:0 ] bogus_reg   ;
 
 reg [16-1:0] adc_counter; // counter for counting mode
-   
+
 
 
 
@@ -147,7 +147,7 @@ assign adc_b_filt_in = adc_b_i ;
 
    // no input filtering
 assign adc_a_filt_out = counting_mode ? adc_counter : adc_a_filt_in;
-   
+
 red_pitaya_dfilt1 i_dfilt1_chb
 (
    // ADC
@@ -185,11 +185,11 @@ always @(posedge adc_clk_i) begin
       adc_b_sum   <= 32'h0 ;
       adc_dec_cnt <= 17'h0 ;
       adc_dv      <=  1'b0 ;
-      
+
    end
    else begin
       adc_counter <= adc_counter + 16'b1;
-      
+
       if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
          adc_dec_cnt <= 17'h1                   ;
          if (negate) begin
@@ -218,7 +218,7 @@ always @(posedge adc_clk_i) begin
          // that instead of the average, retaining some bits.
          if (set_avg_en) begin
            adc_a_dat <= adc_a_sum[15+0 :  0];
-           adc_b_dat <= adc_b_sum[15+0 :  0];  
+           adc_b_dat <= adc_b_sum[15+0 :  0];
          end
          else begin// not average, just return decimated sample
            adc_a_dat <= adc_a_filt_out;
@@ -257,7 +257,7 @@ localparam RSZ = 14 ;  // RAM size 2^RSZ
 
 reg [32-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
 reg [32-1: 0] adc_a_tmp ; // temporary register for accumulating two 16-bit samples before saving to buffer
-   
+
 reg   [14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
 reg   [32-1: 0] adc_a_rd       ;
 reg   [14-1: 0] adc_b_rd       ;
@@ -269,7 +269,7 @@ reg   [ RSZ-1: 0] adc_wp        ;
 reg   [ RSZ-1: 0] adc_raddr     ;
 reg   [ RSZ-1: 0] adc_a_raddr   ;
 reg               adc_a_word_sel;
-   
+
 reg   [ RSZ-1: 0] adc_b_raddr   ;
 reg   [ RSZ-1: 0] xadc_a_raddr  ;
 reg   [ RSZ-1: 0] xadc_b_raddr  ;
@@ -283,11 +283,14 @@ reg   [ RSZ-1: 0] adc_wp_cur    ;
 reg   [  32-1: 0] set_dly       ;
 reg   [  32-1: 0] adc_dly_cnt   ;
 reg               adc_dly_do    ;
+reg               adc_ready_reg ;
 
-assign adc_ready_o = adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
 
-assign post_trig_only = digdar_extra_options[0]; // 1 means only record values to buffer *after* triggering, 
+assign post_trig_only = digdar_extra_options[0]; // 1 means only record values to buffer *after* triggering,
                                                  // so we don't overwrite captured samples while the reader is coping them
+
+assign adc_ready_o = adc_ready_reg;
+
 
 assign negate = digdar_extra_options[1]; // 1 means reverse range of ADC values.
 
@@ -296,7 +299,7 @@ assign read32 = digdar_extra_options[2]; // 1 means reads from buffers are 32 bi
 assign counting_mode = digdar_extra_options[3]; // 1 means we use a counter instead of the real adc values
 
 assign use_sum = digdar_extra_options[4] & (set_dec <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
-    
+
 // Write
 always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
@@ -308,7 +311,8 @@ always @(posedge adc_clk_i) begin
       adc_dly_do  <=  1'b0      ;
    end
    else begin
-      if (adc_arm_do) 
+      adc_ready_reg <= adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
+      if (adc_arm_do)
         adc_we <= ~post_trig_only;
 //        adc_we <= 1'b1 ;
       else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
@@ -354,7 +358,7 @@ always @(posedge adc_clk_i) begin
    if (adc_we && adc_dv) begin
       // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
       // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits
-      adc_a_tmp <= {adc_a_dat, adc_a_tmp[32-1:16] } ; 
+      adc_a_tmp <= {adc_a_dat, adc_a_tmp[32-1:16] } ;
       if (adc_wp[0]) begin
          adc_a_buf[adc_wp[RSZ-1:1]] <= adc_a_tmp;
       end
@@ -375,12 +379,12 @@ assign adc_rd_dv = adc_rval[3];
 
 always @(posedge adc_clk_i) begin
    adc_raddr      <= addr[RSZ+1:2] ; // address synchronous to clock
-   adc_a_raddr    <= adc_raddr     ; // double register 
+   adc_a_raddr    <= adc_raddr     ; // double register
    adc_b_raddr    <= adc_raddr     ; // otherwise memory corruption at reading
-   xadc_a_raddr   <= adc_a_raddr     ; // double register 
+   xadc_a_raddr   <= adc_a_raddr     ; // double register
    xadc_b_raddr   <= adc_b_raddr     ; // otherwise memory corruption at reading
    adc_a_rd       <= adc_a_buf[adc_a_raddr[RSZ-1:1]] ;
-   adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 16 bits of 32 bit value in adc_a_rd; else use lower 16 bits   
+   adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 16 bits of 32 bit value in adc_a_rd; else use lower 16 bits
    adc_b_rd       <= adc_b_buf[adc_b_raddr] ;
    xadc_a_rd      <= xadc_a_buf[xadc_a_raddr] ;
    xadc_b_rd      <= xadc_b_buf[xadc_b_raddr] ;
@@ -437,7 +441,7 @@ always @(posedge adc_clk_i) begin
           4'd10: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
           4'd11: adc_trig <= acp_trig_i    ; // trigger on slow channel A
           4'd12: adc_trig <= arp_trig_i    ; // trigger on slow channel B
-         
+
        default : adc_trig <= 1'b0          ;
       endcase
    end
@@ -497,7 +501,7 @@ always @(posedge adc_clk_i) begin
       adc_scht_bp[1] <= adc_scht_bp[0] ;
       adc_scht_bn[1] <= adc_scht_bn[0] ;
 
-      adc_trig_ap <= adc_scht_ap[0] && !adc_scht_ap[1] ; // make 1 cyc pulse 
+      adc_trig_ap <= adc_scht_ap[0] && !adc_scht_ap[1] ; // make 1 cyc pulse
       adc_trig_an <= adc_scht_an[0] && !adc_scht_an[1] ;
       adc_trig_bp <= adc_scht_bp[0] && !adc_scht_bp[1] ;
       adc_trig_bn <= adc_scht_bn[0] && !adc_scht_bn[1] ;
@@ -651,7 +655,7 @@ always @(posedge adc_clk_i) begin
          if (addr[19:0]==20'h44)   set_b_filt_bb <= wdata[25-1:0] ;
          if (addr[19:0]==20'h48)   set_b_filt_kk <= wdata[25-1:0] ;
          if (addr[19:0]==20'h4C)   set_b_filt_pp <= wdata[25-1:0] ;
-         if (addr[19:0]==20'h50)   digdar_extra_options <= wdata[32-1:0] ; 
+         if (addr[19:0]==20'h50)   digdar_extra_options <= wdata[32-1:0] ;
       end
    end
 end
@@ -664,7 +668,7 @@ always @(*) begin
    err <= 1'b0 ;
 
    casez (addr[19:0])
-     20'h00004 : begin ack <= 1'b1;          rdata <= {{32- 4{1'b0}}, set_trig_src}       ; end 
+     20'h00004 : begin ack <= 1'b1;          rdata <= {{32- 4{1'b0}}, set_trig_src}       ; end
 
      20'h00008 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_a_tresh}        ; end
      20'h0000C : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_b_tresh}        ; end
@@ -731,4 +735,3 @@ bus_clk_bridge i_bridge
 );
 
 endmodule
-
