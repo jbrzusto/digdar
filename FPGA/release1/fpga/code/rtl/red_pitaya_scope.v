@@ -55,7 +55,7 @@
  *
  * Data capture buffer is realized with BRAM. Writing into ram is done with
  * arm/trig logic. With adc_arm_do signal (SW) writing is enabled, this is active
- * until trigger arrives and adc_dly_cnt counts to zero. Value adc_wp_trig
+ * until trigger arrives and n_to_capture counts to zero. Value adc_wp_trig
  * serves as pointer which shows when trigger arrived. This is used to show
  * pre-trigger data.
  *
@@ -192,7 +192,7 @@ module red_pitaya_scope
       else begin
          adc_counter <= adc_counter + 16'b1;
 
-      if ((adc_dec_cnt >= set_dec) || adc_arm_do) begin // start again or arm
+         if (adc_arm_do) begin // arm
             adc_dec_cnt <= 17'h1                   ;
             adc_a_sum   <= $signed(adc_a_filt_out) ;
             adc_b_sum   <= $signed(adc_b_filt_out) ;
@@ -247,35 +247,35 @@ module red_pitaya_scope
    localparam RSZ = 14 ;  // RAM size 2^RSZ
 
 
-   reg [32-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
-   reg [32-1: 0] adc_a_tmp ; // temporary register for accumulating two 16-bit samples before saving to buffer
+   reg [  32-1: 0] adc_a_buf [0:(1<<(RSZ-1))-1] ; // 28 bits so we can do 32 bit reads
+   reg [  32-1: 0] adc_a_tmp ; // temporary register for accumulating two 16-bit samples before saving to buffer
 
-   reg [14-1: 0] adc_b_buf [0:(1<<RSZ)-1] ;
-   reg [32-1: 0] adc_a_rd       ;
-   reg [14-1: 0] adc_b_rd       ;
-   reg [12-1: 0] xadc_a_buf [0:(1<<RSZ)-1] ;
-   reg [12-1: 0] xadc_b_buf [0:(1<<RSZ)-1] ;
-   reg [12-1: 0] xadc_a_rd       ;
-   reg [12-1: 0] xadc_b_rd       ;
-   reg [ RSZ-1: 0] adc_wp        ;
-   reg [ RSZ-1: 0] adc_raddr     ;
-   reg [ RSZ-1: 0] adc_a_raddr   ;
-   reg             adc_a_word_sel;
+   reg [  14-1: 0] adc_b_buf [0:(1<<RSZ)-1]  ;
+   reg [  32-1: 0] adc_a_rd                  ;
+   reg [  14-1: 0] adc_b_rd                  ;
+   reg [  12-1: 0] xadc_a_buf [0:(1<<RSZ)-1] ;
+   reg [  12-1: 0] xadc_b_buf [0:(1<<RSZ)-1] ;
+   reg [  12-1: 0] xadc_a_rd                 ;
+   reg [  12-1: 0] xadc_b_rd                 ;
+   reg [ RSZ-1: 0] adc_wp                    ;
+   reg [ RSZ-1: 0] adc_raddr                 ;
+   reg [ RSZ-1: 0] adc_a_raddr               ;
+   reg             adc_a_word_sel            ;
 
-   reg [ RSZ-1: 0] adc_b_raddr   ;
-   reg [ RSZ-1: 0] xadc_a_raddr  ;
-   reg [ RSZ-1: 0] xadc_b_raddr  ;
-   reg [   4-1: 0] adc_rval      ;
-   wire            adc_rd_dv     ;
-   reg             adc_we        ;
-   reg             adc_trig      ;
+   reg [ RSZ-1: 0] adc_b_raddr               ;
+   reg [ RSZ-1: 0] xadc_a_raddr              ;
+   reg [ RSZ-1: 0] xadc_b_raddr              ;
+   reg [   4-1: 0] adc_rval                  ;
+   wire            adc_rd_dv                 ;
+   reg             adc_we                    ;
+   reg             adc_trig                  ;
 
-   reg [ RSZ-1: 0] adc_wp_trig   ;
-   reg [ RSZ-1: 0] adc_wp_cur    ;
-   reg [  32-1: 0] set_dly       ;
-   reg [  32-1: 0] adc_dly_cnt   ;
-   reg             adc_dly_do    ;
-   reg             adc_ready_reg ;
+   reg [ RSZ-1: 0] adc_wp_trig               ;
+   reg [ RSZ-1: 0] adc_wp_cur                ;
+   reg [  32-1: 0] set_dly                   ;
+   reg [  32-1: 0] n_to_capture              ;
+   reg             is_capturing              ;
+   reg             adc_ready_reg             ;
 
 
    assign post_trig_only = digdar_extra_options[0]; // 1 means only record values to buffer *after* triggering,
@@ -299,15 +299,15 @@ module red_pitaya_scope
       adc_we      <=  1'b0      ;
       adc_wp_trig <= {RSZ{1'b0}};
       adc_wp_cur  <= {RSZ{1'b0}};
-      adc_dly_cnt <= 32'h0      ;
-      adc_dly_do  <=  1'b0      ;
+      n_to_capture <= 32'h0      ;
+      is_capturing  <=  1'b0      ;
    end
       else begin
-         adc_ready_reg <= adc_we & ~ adc_dly_do;   // ready if saving values but not triggered
+         adc_ready_reg <= adc_we & ~ is_capturing;   // ready if saving values but not triggered
          if (adc_arm_do)
            adc_we <= ~post_trig_only;
          //        adc_we <= 1'b1 ;
-         else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delayed reached or reset
+         else if (((is_capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delayed reached or reset
            adc_we <= 1'b0 ;
 
 
@@ -318,7 +318,7 @@ module red_pitaya_scope
 
          if (adc_rst_do)
            adc_wp_trig <= {RSZ{1'b0}};
-         else if (adc_trig && !adc_dly_do)
+         else if (adc_trig && !is_capturing)
            adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
 
          if (adc_rst_do)
@@ -329,19 +329,19 @@ module red_pitaya_scope
 
          if (adc_trig)
            begin
-              adc_dly_do  <= 1'b1 ;
+              is_capturing  <= 1'b1 ;
               adc_we <= 1'b1;
            end
-         else if ((adc_dly_do && (adc_dly_cnt == 32'b0)) || adc_rst_do || adc_arm_do) //delayed reached or reset
+         else if ((is_capturing && (n_to_capture == 32'b0)) || adc_rst_do || adc_arm_do) //delayed reached or reset
            begin
-              adc_dly_do  <= 1'b0 ;
+              is_capturing  <= 1'b0 ;
               adc_we <= 1'b0;
            end
 
-         if (adc_dly_do && adc_we && adc_dv)
-           adc_dly_cnt <= adc_dly_cnt + {32{1'b1}} ; // -1
-         else if (!adc_dly_do)
-           adc_dly_cnt <= set_dly + set_dec; // add decimation count to preserve write-enable for the extra cycles required to store the final word
+         if (is_capturing && adc_we && adc_dv)
+           n_to_capture <= n_to_capture + {32{1'b1}} ; // -1
+         else if (!is_capturing)
+           n_to_capture <= set_dly + set_dec; // add decimation count to preserve write-enable for the extra cycles required to store the final word
 
       end
    end
@@ -417,7 +417,7 @@ module red_pitaya_scope
 
          if (wen && (addr[19:0]==20'h4))
            set_trig_src <= wdata[3:0] ;
-         else if (((adc_dly_do || adc_trig) && (adc_dly_cnt == 32'h0)) || adc_rst_do) //delay reached or reset
+         else if (((is_capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
            set_trig_src <= 4'h0 ;
 
          case (set_trig_src)
