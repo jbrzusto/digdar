@@ -419,8 +419,8 @@ always @(posedge adc_clk_i) begin
       adc_trig      <= 1'b0 ;
    end
    else begin
-      adc_arm_do  <= wen && (addr[19:0]==20'h0) && wdata[0] ; // SW ARM
-      adc_rst_do  <= wen && (addr[19:0]==20'h0) && wdata[1] ;
+      adc_arm_do  <= wen && (addr[19:0]==20'h0) && wdata[0] ; // SW arm
+      adc_rst_do  <= wen && (addr[19:0]==20'h0) && wdata[1] ; // SW reset
       adc_trig_sw <= wen && (addr[19:0]==20'h4) ; // SW trigger
 
       if (wen && (addr[19:0]==20'h4))
