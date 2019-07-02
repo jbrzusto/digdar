@@ -13,20 +13,6 @@
  * for more details on the language used herein.
  */
 
-/*
- FIXME: does this version have two invalid samples at start of each pulse?
- If so, then the counting logic is broken and we're writing one pair fewer
- of samples to the buffer than we should be, but we're also starting
- one pair of samples too early and this line (326):
-
-          adc_wp_trig <= adc_wp - 1'b1 ; // save write pointer at trigger arrival
-
- should be replaced with:
-
-          adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
- */
-
-
 /**
  * GENERAL DESCRIPTION:
  *
@@ -34,18 +20,13 @@
  * application. It consists from three main parts.
  *
  *
- *                /--------\      /-----------\            /-----\
- *   ADC CHA ---> | DFILT1 | ---> | AVG & DEC | ---------> | BUF | --->  SW
- *                \--------/      \-----------/     |      \-----/
- *                                                  ˇ         ^
- *                                              /------\      |
- *   ext trigger -----------------------------> | TRIG | -----+
- *                                              \------/      |
- *                                                  ^         ˇ
- *                /--------\      /-----------\     |      /-----\
- *   ADC CHB ---> | DFILT1 | ---> | AVG & DEC | ---------> | BUF | --->  SW
- *                \--------/      \-----------/            \-----/
- *
+ *                 /-----------\            /-----\
+ *   ADC CHA --->  | AVG & DEC | ---------> | BUF | --->  SW
+ *                 \-----------/            \-----/
+ *                   |
+ *                /------\
+ *  ADC CHB --->  | TRIG |
+ *                \------/
  *
  * Input data is optionaly averaged and decimated via average filter.
  *
@@ -53,12 +34,13 @@
  * signal. To make trigger from analog signal schmitt trigger is used, external
  * trigger goes first over debouncer, which is separate for pos. and neg. edge.
  *
- * Data capture buffer is realized with BRAM. Writing into ram is done with
- * arm/trig logic. With adc_arm_do signal (SW) writing is enabled, this is active
- * until trigger arrives and n_to_capture counts to zero. Value adc_wp_trig
- * serves as pointer which shows when trigger arrived. This is used to show
- * pre-trigger data.
- *
+ * After arming, detection of a trigger begins writing of decimated / averaged / summed
+ * data to BRAM buffers.  Summing can happen for decimation rates 1, 2, 3, and 4, because
+ * a sum of up to 4 unsigned samples of 14 bits each fits in an unsigned 16 bit word.
+ * Averaging can happen for decimation rates 2, 4, 8, 64, 1024, 8192, 65536 because
+ * averaging requires only a shift.
+ * For all other decimation rates n, only decimation is allowed:  the last of each
+ * set of n consecutive samples is used.
  */
 
 
