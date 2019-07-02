@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <Strategy Version="1" Minor="2">
-	<StratHandle Name="Performance_NetDelay_medium" Flow="Vivado Implementation 2013">
-		<Desc>To compensate for optimistic delay estimation, add extra delay cost to long distance and high fanout connections. (medium setting)</Desc>
+	<StratHandle Name="Performance_NetDelay_high" Flow="Vivado Implementation 2013">
+		<Desc>To compensate for optimistic delay estimation, add extra delay cost to long distance and high fanout connections. (high setting, most pessimistic)</Desc>
 	</StratHandle>
 	<Step Id="init_design">
 	</Step>
@@ -10,7 +10,7 @@
 	<Step Id="power_opt_design">
 	</Step>
 	<Step Id="place_design">
-		<Option Id="Directive">4</Option>
+		<Option Id="Directive">3</Option>
 	</Step>
 	<Step Id="post_place_power_opt_design">
 	</Step>
