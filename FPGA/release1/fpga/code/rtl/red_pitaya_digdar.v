@@ -51,7 +51,6 @@
 `define OFFSET_ARP_PREV_CLOCK_HIGH        20'h00060 // clock at previous ARP (high 32 bits)
 
 `define OFFSET_ACP_PER_ARP                20'h00064 // count of ACP pulses between two most recent ARP pulses
-`define OFFSET_VID_NEG                    20'h00068 // negate video channel?
 
 // copies of registers saved at the start of each digitizing period
 
@@ -102,7 +101,6 @@ module red_pitaya_digdar
    output            radar_trig_o, //!< edge of radar trigger signal
    output            acp_trig_o, //!< edge of acp pulse
    output            arp_trig_o, //!< edge of arp pulse
-   output            adc_neg_a_o, //!< negate video channel?  Note: this is 0 to negate, 1 to not negate.
 
    // system bus
    input             sys_clk_i , //!< bus clock
@@ -132,8 +130,6 @@ module red_pitaya_digdar
    reg [64-1: 0]     arp_prev_clock     ;
    reg [64-1: 0]     clock_counter      ;
    reg [32-1: 0]     acp_per_arp        ;
-   reg               vid_neg            ;
-
    reg [32-1: 0]     acp_at_arp         ;
    reg [32-1: 0]     trig_at_arp        ;
    reg [14-1: 0]     trig_thresh_excite  ;
@@ -245,7 +241,6 @@ module red_pitaya_digdar
          trig_prev_clock     <= 64'h0;
 
          acp_per_arp         <= 32'h0;
-         vid_neg             <= 1'b1; // sense is inverted; 1 means don't negate
 
          acp_at_arp          <= 32'h0;
          trig_at_arp         <= 32'h0;
@@ -276,7 +271,6 @@ module red_pitaya_digdar
               `OFFSET_TRIG_THRESH_RELAX   : trig_thresh_relax   <= wdata[ 12-1: 0];
               `OFFSET_TRIG_DELAY          : trig_delay          <= wdata[ 32-1: 0];
               `OFFSET_TRIG_LATENCY        : trig_latency        <= wdata[ 32-1: 0];
-              `OFFSET_VID_NEG             : vid_neg             <= ~ wdata[ 0 ];
             endcase
          end // if (wen)
 
@@ -345,7 +339,6 @@ module red_pitaya_digdar
         `OFFSET_CLOCKS_LOW           : begin ack <= 1'b1;  rdata <= {               clock_counter[32-1:  0]  }; end
         `OFFSET_CLOCKS_HIGH          : begin ack <= 1'b1;  rdata <= {               clock_counter[63-1: 32]  }; end
         `OFFSET_ACP_PER_ARP          : begin ack <= 1'b1;  rdata <= {               acp_per_arp              }; end
-        `OFFSET_VID_NEG              : begin ack <= 1'b1;  rdata <= {{32-1{1'b0}},  ~vid_neg                 }; end // negated sense: input of 1 means negate but we convert that to 0
         `OFFSET_ACP_AT_ARP           : begin ack <= 1'b1;  rdata <= {               acp_at_arp               }; end
         `OFFSET_TRIG_AT_ARP          : begin ack <= 1'b1;  rdata <= {               trig_at_arp              }; end
         `OFFSET_ACP_RAW              : begin ack <= 1'b1;  rdata <= {{32-12{1'b0}}, xadc_a_i                 }; end

@@ -272,7 +272,6 @@ module red_pitaya_top
    // always negate trigger signal
    assign adc_neg_b = 1'b1;
 
-
    wire             ser_clk     ;
    wire             adc_clk     ;
    reg              adc_rstn    ;
@@ -470,6 +469,7 @@ module red_pitaya_top
 
       .adc_ready_o     (  adc_ready                  ),  // asserted while ADC armed but not triggered
 
+      .negate_o        (  adc_neg_a                  ),  // true if video signal should be negated (taking into account that the pre-amp already does this!)
       // System bus
       .sys_clk_i       (  sys_clk                    ),  // clock
       .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
@@ -556,7 +556,6 @@ module red_pitaya_top
       .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
       .acp_trig_o      (  acp_trig                   ),  // acp trigger
       .arp_trig_o      (  arp_trig                   ),  // arp trigger
-      .adc_neg_a_o     (  adc_neg_a                  ),  // negate video channel?
 
       // System bus
       .sys_clk_i       (  sys_clk                    ),  // clock
