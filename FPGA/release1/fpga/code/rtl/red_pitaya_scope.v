@@ -176,17 +176,17 @@ module red_pitaya_scope
    reg [ 14-1: 0]    adc_b_dat     ;
    reg [ 32-1: 0]    adc_a_sum     ;
    reg [ 32-1: 0]    adc_b_sum     ;
-   reg [ 17-1: 0]    set_dec       ;
+   reg [ 17-1: 0]    dec_rate      ;
    reg [ 17-1: 0]    adc_dec_cnt   ;
-   reg               set_avg_en    ;
-   reg               adc_dv        ;
+   reg               avg_en        ;
+   reg               dec_done        ;
 
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0) begin
          adc_a_sum   <= 32'h0 ;
          adc_b_sum   <= 32'h0 ;
          adc_dec_cnt <= 17'h0 ;
-         adc_dv      <=  1'b0 ;
+         dec_done      <=  1'b0 ;
 
       end
       else begin
@@ -203,12 +203,12 @@ module red_pitaya_scope
             adc_b_sum   <= $signed(adc_b_sum) + $signed(adc_b_filt_out) ;
          end
 
-         adc_dv <= (adc_dec_cnt >= set_dec) ;
+         dec_done <= (adc_dec_cnt >= dec_rate) ;
 
          if (use_sum) begin
             // for decimation rates <= 4, the sum fits in 16 bits, so we can return
             // that instead of the average, retaining some bits.
-            if (set_avg_en) begin
+            if (avg_en) begin
                adc_a_dat <= adc_a_sum[15+0 :  0];
                adc_b_dat <= adc_b_sum[15+0 :  0];
             end
@@ -218,7 +218,7 @@ module red_pitaya_scope
             end
          end
          else begin
-            case (set_dec & {17{set_avg_en}})
+            case (dec_rate & {17{avg_en}})
               17'h0     : begin adc_a_dat <= adc_a_filt_out;            adc_b_dat <= adc_b_filt_out;        end
               17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
               17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
@@ -290,7 +290,7 @@ module red_pitaya_scope
 
    assign counting_mode = digdar_extra_options[3]; // 1 means we use a counter instead of the real adc values
 
-   assign use_sum = digdar_extra_options[4] & (set_dec <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
+   assign use_sum = digdar_extra_options[4] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
 
    // Write
    always @(posedge adc_clk_i) begin
@@ -313,7 +313,7 @@ module red_pitaya_scope
 
          if (adc_rst_do)
            adc_wp <= {RSZ{1'b1}};
-         else if (adc_we && adc_dv)
+         else if (adc_we && dec_done)
            adc_wp <= adc_wp + 1'b1 ;
 
          if (adc_rst_do)
@@ -323,7 +323,7 @@ module red_pitaya_scope
 
          if (adc_rst_do)
            adc_wp_cur <= {RSZ{1'b0}};
-         else if (adc_we && adc_dv)
+         else if (adc_we && dec_done)
            adc_wp_cur <= adc_wp ; // save current write pointer
 
 
@@ -338,16 +338,16 @@ module red_pitaya_scope
               adc_we <= 1'b0;
            end
 
-         if (is_capturing && adc_we && adc_dv)
+         if (is_capturing && adc_we && dec_done)
            n_to_capture <= n_to_capture + {32{1'b1}} ; // -1
          else if (!is_capturing)
-           n_to_capture <= set_dly + set_dec; // add decimation count to preserve write-enable for the extra cycles required to store the final word
+           n_to_capture <= set_dly + dec_rate; // add decimation count to preserve write-enable for the extra cycles required to store the final word
 
       end
    end
 
    always @(posedge adc_clk_i) begin
-      if (adc_we && adc_dv) begin
+      if (adc_we && dec_done) begin
          // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
          // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits
          adc_a_tmp <= {adc_a_dat, adc_a_tmp[32-1:16] } ;
@@ -476,7 +476,7 @@ module red_pitaya_scope
          set_b_threshp <= set_b_thresh + set_b_hyst ;
          set_b_threshm <= set_b_thresh - set_b_hyst ;
 
-         if (adc_dv) begin
+         if (dec_done) begin
             if ($signed(adc_a_dat) >= $signed(set_a_thresh ))      adc_scht_ap[0] <= 1'b1 ;  // threshold reached
             else if ($signed(adc_a_dat) <  $signed(set_a_threshm))      adc_scht_ap[0] <= 1'b0 ;  // wait until it goes under hysteresis
             if ($signed(adc_a_dat) <= $signed(set_a_thresh ))      adc_scht_an[0] <= 1'b1 ;  // threshold reached
@@ -611,13 +611,13 @@ module red_pitaya_scope
 
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0) begin
-         set_a_thresh   <=  14'd5000   ;
-         set_b_thresh   <= -14'd5000   ;
+         set_a_thresh  <=  14'd5000   ;
+         set_b_thresh  <= -14'd5000   ;
          set_dly       <=  32'd0      ;
-         set_dec       <=  17'd1      ;
+         dec_rate      <=  17'd1      ;
          set_a_hyst    <=  14'd20     ;
          set_b_hyst    <=  14'd20     ;
-         set_avg_en    <=   1'b1      ;
+         avg_en        <=   1'b1      ;
          set_a_filt_aa <=  18'h0      ;
          set_a_filt_bb <=  25'h0      ;
          set_a_filt_kk <=  25'hFFFFFF ;
@@ -626,18 +626,18 @@ module red_pitaya_scope
          set_b_filt_bb <=  25'h0      ;
          set_b_filt_kk <=  25'hFFFFFF ;
          set_b_filt_pp <=  25'h0      ;
-         digdar_extra_options <= 32'h0      ;
-         adc_counter       <=  14'h0      ;
+         digdar_extra_options <= 32'h0;
+         adc_counter   <=  14'h0      ;
       end
       else begin
          if (wen) begin
             if (addr[19:0]==20'h8)    set_a_thresh <= wdata[14-1:0] ;
             if (addr[19:0]==20'hC)    set_b_thresh <= wdata[14-1:0] ;
-            if (addr[19:0]==20'h10)   set_dly     <= wdata[32-1:0] ;
-            if (addr[19:0]==20'h14)   set_dec     <= wdata[17-1:0] ;
-            if (addr[19:0]==20'h20)   set_a_hyst  <= wdata[14-1:0] ;
-            if (addr[19:0]==20'h24)   set_b_hyst  <= wdata[14-1:0] ;
-            if (addr[19:0]==20'h28)   set_avg_en  <= wdata[     0] ;
+            if (addr[19:0]==20'h10)   set_dly      <= wdata[32-1:0] ;
+            if (addr[19:0]==20'h14)   dec_rate     <= wdata[17-1:0] ;
+            if (addr[19:0]==20'h20)   set_a_hyst   <= wdata[14-1:0] ;
+            if (addr[19:0]==20'h24)   set_b_hyst   <= wdata[14-1:0] ;
+            if (addr[19:0]==20'h28)   avg_en       <= wdata[     0] ;
 
             if (addr[19:0]==20'h30)   set_a_filt_aa <= wdata[18-1:0] ;
             if (addr[19:0]==20'h34)   set_a_filt_bb <= wdata[25-1:0] ;
@@ -665,7 +665,7 @@ module red_pitaya_scope
         20'h00008 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_a_thresh}       ; end
         20'h0000C : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_b_thresh}       ; end
         20'h00010 : begin ack <= 1'b1;          rdata <= {               set_dly}            ; end
-        20'h00014 : begin ack <= 1'b1;          rdata <= {{32-17{1'b0}}, set_dec}            ; end
+        20'h00014 : begin ack <= 1'b1;          rdata <= {{32-17{1'b0}}, dec_rate}           ; end
 
         20'h00018 : begin ack <= 1'b1;          rdata <= {{32-RSZ{1'b0}}, adc_wp_cur}        ; end
         20'h0001C : begin ack <= 1'b1;          rdata <= {{32-RSZ{1'b0}}, adc_wp_trig}       ; end
@@ -673,7 +673,7 @@ module red_pitaya_scope
         20'h00020 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_a_hyst}         ; end
         20'h00024 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_b_hyst}         ; end
 
-        20'h00028 : begin ack <= 1'b1;          rdata <= {{32- 1{1'b0}}, set_avg_en}         ; end
+        20'h00028 : begin ack <= 1'b1;          rdata <= {{32- 1{1'b0}}, avg_en}             ; end
 
         20'h00030 : begin ack <= 1'b1;          rdata <= {{32-18{1'b0}}, set_a_filt_aa}      ; end
         20'h00034 : begin ack <= 1'b1;          rdata <= {{32-25{1'b0}}, set_a_filt_bb}      ; end
