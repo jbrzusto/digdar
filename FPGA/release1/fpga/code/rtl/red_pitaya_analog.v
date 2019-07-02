@@ -17,10 +17,10 @@
 /**
  * GENERAL DESCRIPTION:
  *
- * Interace module between fast ADC and DAC IC.  
+ * Interace module between fast ADC and DAC IC.
  *
  *
- *                 /------------\      
+ *                 /------------\
  *   ADC DAT ----> | RAW -> 2's | ----> ADC DATA TO USER
  *                 \------------/
  *                       ^
@@ -43,19 +43,18 @@
  * ADC clock is used for main clock domain, from this double clock is made which
  * is used for driving DAC IC (using DDR transfer) and PWM counters.
  *
- * ADC interface gives unsigned number format with negative slope because 
- * input amplifier. This is transfomed into 2's complement wich is more usable in
- * digital world.
+ * ADC channels A and B are inverted by an amplifier and values are on a linear 0...3fff scale.
+ * User can choose to invert either channel, but regardless, scale is converted to two's complement.
  *
- * For sending data to DAC values has to be first translated from 2's format to 
+ * For sending data to DAC values has to be first translated from 2's format to
  * unsigned format, where negative output amplifier gain is taken into account.
  * Interface to DAC is DDR, positive edge used for CHA and negative for CHB.
- 
+
  * PWM in created with counter running on 2xDAC clock. Each 16 cycles of PWM_FULL
  * counts new value is taken. Upper 8 bits are used for dac_pwm_vcnt which defines
  * PWM rate of output. This repeates 16x times, where lower 16bits of input data
  * defines if ration of dac_pwm_vcnt is one cycle more.
- * 
+ *
  */
 
 
@@ -64,37 +63,39 @@
 module red_pitaya_analog
 (
   // ADC IC
-  input    [ 16-1: 2] adc_dat_a_i        ,  //!< ADC IC CHA data connection
-  input    [ 16-1: 2] adc_dat_b_i        ,  //!< ADC IC CHB data connection
-  input               adc_clk_p_i        ,  //!< ADC IC clock P connection
-  input               adc_clk_n_i        ,  //!< ADC IC clock N connection
-  
+  input [ 16-1: 2]  adc_dat_a_i , //!< ADC IC CHA data connection
+  input [ 16-1: 2]  adc_dat_b_i , //!< ADC IC CHB data connection
+  input             adc_clk_p_i , //!< ADC IC clock P connection
+  input             adc_clk_n_i , //!< ADC IC clock N connection
+  input             adc_neg_a_i , //!< negate slope of ADC CHA?
+  input             adc_neg_b_i , //!< negate slope of ADC CHB?
+
   // DAC IC
-  output   [ 14-1: 0] dac_dat_o          ,  //!< DAC IC combined data
-  output              dac_wrt_o          ,  //!< DAC IC write enable
-  output              dac_sel_o          ,  //!< DAC IC channel select
-  output              dac_clk_o          ,  //!< DAC IC clock
-  output              dac_rst_o          ,  //!< DAC IC reset
-  
+  output [ 14-1: 0] dac_dat_o , //!< DAC IC combined data
+  output            dac_wrt_o , //!< DAC IC write enable
+  output            dac_sel_o , //!< DAC IC channel select
+  output            dac_clk_o , //!< DAC IC clock
+  output            dac_rst_o , //!< DAC IC reset
+
   // PWM DAC
-  output   [  4-1: 0] dac_pwm_o          ,  //!< DAC PWM - driving RC
-  
-  
+  output [ 4-1: 0]  dac_pwm_o , //!< DAC PWM - driving RC
+
+
   // user interface
-  output   [ 14-1: 0] adc_dat_a_o        ,  //!< ADC CHA data
-  output   [ 14-1: 0] adc_dat_b_o        ,  //!< ADC CHB data
-  output              adc_clk_o          ,  //!< ADC clock
-  input               adc_rst_i          ,  //!< ADC reset - active low
-  output              ser_clk_o          ,  //!< fast serial clock
+  output [ 14-1: 0] adc_dat_a_o , //!< ADC CHA data
+  output [ 14-1: 0] adc_dat_b_o , //!< ADC CHB data
+  output            adc_clk_o , //!< ADC clock
+  input             adc_rst_i , //!< ADC reset - active low
+  output            ser_clk_o , //!< fast serial clock
 
-  input    [ 14-1: 0] dac_dat_a_i        ,  //!< DAC CHA data
-  input    [ 14-1: 0] dac_dat_b_i        ,  //!< DAC CHB data
+  input [ 14-1: 0]  dac_dat_a_i , //!< DAC CHA data
+  input [ 14-1: 0]  dac_dat_b_i , //!< DAC CHB data
 
-  input    [ 24-1: 0] dac_pwm_a_i        ,  //!< DAC PWM CHA
-  input    [ 24-1: 0] dac_pwm_b_i        ,  //!< DAC PWM CHB
-  input    [ 24-1: 0] dac_pwm_c_i        ,  //!< DAC PWM CHC
-  input    [ 24-1: 0] dac_pwm_d_i        ,  //!< DAC PWM CHD
-  output              dac_pwm_sync_o        //!< DAC PWM sync
+  input [ 24-1: 0]  dac_pwm_a_i , //!< DAC PWM CHA
+  input [ 24-1: 0]  dac_pwm_b_i , //!< DAC PWM CHB
+  input [ 24-1: 0]  dac_pwm_c_i , //!< DAC PWM CHC
+  input [ 24-1: 0]  dac_pwm_d_i , //!< DAC PWM CHD
+  output            dac_pwm_sync_o        //!< DAC PWM sync
 );
 
 
@@ -114,9 +115,9 @@ always @(posedge adc_clk) begin
    adc_dat_a <= adc_dat_a_i[16-1:2]; // lowest 2 bits reserved for 16bit ADC
    adc_dat_b <= adc_dat_b_i[16-1:2];
 end
-    
-assign adc_dat_a_o = {adc_dat_a[14-1], ~adc_dat_a[14-2:0]}; // transform into 2's complement (negative slope)
-assign adc_dat_b_o = {adc_dat_b[14-1], ~adc_dat_b[14-2:0]};
+
+assign adc_dat_a_o = adc_neg_a_i ? {adc_dat_a[14-1], ~adc_dat_a[14-2:0]} : {~adc_dat_a[14-1], adc_dat_a[14-2:0]}; // convert to 2's complement and if requested, negate
+assign adc_dat_b_o = adc_neg_b_i ? {adc_dat_b[14-1], ~adc_dat_b[14-2:0]} : {~adc_dat_b[14-1], adc_dat_b[14-2:0]}; // convert to 2's complement and if requested, negate
 assign adc_clk_o   =  adc_clk ;
 
 
@@ -321,4 +322,3 @@ assign dac_pwm_sync_o = (dac_pwm_bcnt == 4'hF) && (dac_pwm_vcnt == (PWM_FULL-1))
 
 
 endmodule
-
