@@ -458,12 +458,12 @@ reg  [  2-1: 0] adc_scht_ap  ;
 reg  [  2-1: 0] adc_scht_an  ;
 reg  [  2-1: 0] adc_scht_bp  ;
 reg  [  2-1: 0] adc_scht_bn  ;
-reg  [ 14-1: 0] set_a_tresh  ;
-reg  [ 14-1: 0] set_a_treshp ;
-reg  [ 14-1: 0] set_a_treshm ;
-reg  [ 14-1: 0] set_b_tresh  ;
-reg  [ 14-1: 0] set_b_treshp ;
-reg  [ 14-1: 0] set_b_treshm ;
+reg  [ 14-1: 0] set_a_thresh  ;
+reg  [ 14-1: 0] set_a_threshp ;
+reg  [ 14-1: 0] set_a_threshm ;
+reg  [ 14-1: 0] set_b_thresh  ;
+reg  [ 14-1: 0] set_b_threshp ;
+reg  [ 14-1: 0] set_b_threshm ;
 reg  [ 14-1: 0] set_a_hyst   ;
 reg  [ 14-1: 0] set_b_hyst   ;
 
@@ -479,21 +479,21 @@ always @(posedge adc_clk_i) begin
       adc_trig_bn  <=  1'b0 ;
    end
    else begin
-      set_a_treshp <= set_a_tresh + set_a_hyst ; // calculate positive
-      set_a_treshm <= set_a_tresh - set_a_hyst ; // and negative treshold
-      set_b_treshp <= set_b_tresh + set_b_hyst ;
-      set_b_treshm <= set_b_tresh - set_b_hyst ;
+      set_a_threshp <= set_a_thresh + set_a_hyst ; // calculate positive
+      set_a_threshm <= set_a_thresh - set_a_hyst ; // and negative threshold
+      set_b_threshp <= set_b_thresh + set_b_hyst ;
+      set_b_threshm <= set_b_thresh - set_b_hyst ;
 
       if (adc_dv) begin
-              if ($signed(adc_a_dat) >= $signed(set_a_tresh ))      adc_scht_ap[0] <= 1'b1 ;  // treshold reached
-         else if ($signed(adc_a_dat) <  $signed(set_a_treshm))      adc_scht_ap[0] <= 1'b0 ;  // wait until it goes under hysteresis
-              if ($signed(adc_a_dat) <= $signed(set_a_tresh ))      adc_scht_an[0] <= 1'b1 ;  // treshold reached
-         else if ($signed(adc_a_dat) >  $signed(set_a_treshp))      adc_scht_an[0] <= 1'b0 ;  // wait until it goes over hysteresis
+              if ($signed(adc_a_dat) >= $signed(set_a_thresh ))      adc_scht_ap[0] <= 1'b1 ;  // threshold reached
+         else if ($signed(adc_a_dat) <  $signed(set_a_threshm))      adc_scht_ap[0] <= 1'b0 ;  // wait until it goes under hysteresis
+              if ($signed(adc_a_dat) <= $signed(set_a_thresh ))      adc_scht_an[0] <= 1'b1 ;  // threshold reached
+         else if ($signed(adc_a_dat) >  $signed(set_a_threshp))      adc_scht_an[0] <= 1'b0 ;  // wait until it goes over hysteresis
 
-              if ($signed(adc_b_dat) >= $signed(set_b_tresh ))      adc_scht_bp[0] <= 1'b1 ;
-         else if ($signed(adc_b_dat) <  $signed(set_b_treshm))      adc_scht_bp[0] <= 1'b0 ;
-              if ($signed(adc_b_dat) <= $signed(set_b_tresh ))      adc_scht_bn[0] <= 1'b1 ;
-         else if ($signed(adc_b_dat) >  $signed(set_b_treshp))      adc_scht_bn[0] <= 1'b0 ;
+              if ($signed(adc_b_dat) >= $signed(set_b_thresh ))      adc_scht_bp[0] <= 1'b1 ;
+         else if ($signed(adc_b_dat) <  $signed(set_b_threshm))      adc_scht_bp[0] <= 1'b0 ;
+              if ($signed(adc_b_dat) <= $signed(set_b_thresh ))      adc_scht_bn[0] <= 1'b1 ;
+         else if ($signed(adc_b_dat) >  $signed(set_b_threshp))      adc_scht_bn[0] <= 1'b0 ;
       end
 
       adc_scht_ap[1] <= adc_scht_ap[0] ;
@@ -619,8 +619,8 @@ assign asg_trig_n = (asg_trig_dn == 2'b10) ;
 
 always @(posedge adc_clk_i) begin
    if (adc_rstn_i == 1'b0) begin
-      set_a_tresh   <=  14'd5000   ;
-      set_b_tresh   <= -14'd5000   ;
+      set_a_thresh   <=  14'd5000   ;
+      set_b_thresh   <= -14'd5000   ;
       set_dly       <=  32'd0      ;
       set_dec       <=  17'd1      ;
       set_a_hyst    <=  14'd20     ;
@@ -639,8 +639,8 @@ always @(posedge adc_clk_i) begin
    end
    else begin
       if (wen) begin
-         if (addr[19:0]==20'h8)    set_a_tresh <= wdata[14-1:0] ;
-         if (addr[19:0]==20'hC)    set_b_tresh <= wdata[14-1:0] ;
+         if (addr[19:0]==20'h8)    set_a_thresh <= wdata[14-1:0] ;
+         if (addr[19:0]==20'hC)    set_b_thresh <= wdata[14-1:0] ;
          if (addr[19:0]==20'h10)   set_dly     <= wdata[32-1:0] ;
          if (addr[19:0]==20'h14)   set_dec     <= wdata[17-1:0] ;
          if (addr[19:0]==20'h20)   set_a_hyst  <= wdata[14-1:0] ;
@@ -670,8 +670,8 @@ always @(*) begin
    casez (addr[19:0])
      20'h00004 : begin ack <= 1'b1;          rdata <= {{32- 4{1'b0}}, set_trig_src}       ; end
 
-     20'h00008 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_a_tresh}        ; end
-     20'h0000C : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_b_tresh}        ; end
+     20'h00008 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_a_thresh}       ; end
+     20'h0000C : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, set_b_thresh}       ; end
      20'h00010 : begin ack <= 1'b1;          rdata <= {               set_dly}            ; end
      20'h00014 : begin ack <= 1'b1;          rdata <= {{32-17{1'b0}}, set_dec}            ; end
 
