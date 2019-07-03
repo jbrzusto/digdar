@@ -96,7 +96,7 @@ module red_pitaya_digdar
    input             xadc_a_strobe_i, //!< strobe for most recent value from slow ADC channel A
    input             xadc_b_strobe_i, //!< strobe for most recent value from slow ADC channel B
 
-   input             adc_ready_i, //!< true when ADC is armed but not yet triggered
+   input             capturing_i, //!< true when ADC is armed but not yet triggered
 
    output            radar_trig_o, //!< edge of radar trigger signal
    output            acp_trig_o, //!< edge of acp pulse
@@ -294,11 +294,11 @@ module red_pitaya_digdar
             trig_prev_clock      <= trig_clock;
          end
 
-         if (radar_trig_o & adc_ready_i) begin
-            // we've been triggered and ADC is ready to write data to buffer
-            // save copies of metadata registers for this pulse.  We require
-            // adc_ready_i so that we don't overwrite the saved metadata registers
-            // while the CPU is processing an already digitized pulse.
+         if (radar_trig_o & ! capturing_i) begin
+            // we've been triggered but are not already capturing so
+            // save copies of metadata registers for this pulse.
+            // (If radar_trig_o is true but we are already capturing,
+            // the capture interval is too long for the trigger rate!)
             saved_acp_count           <=  acp_count          ;
             saved_acp_clock           <=  acp_clock          ;
             saved_acp_prev_clock      <=  acp_prev_clock     ;
