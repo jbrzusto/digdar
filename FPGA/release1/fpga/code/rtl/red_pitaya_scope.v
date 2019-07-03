@@ -256,7 +256,7 @@ module red_pitaya_scope
    reg [ RSZ-1: 0] adc_wp_cur                ;
    reg [  32-1: 0] set_dly                   ;
    reg [  32-1: 0] n_to_capture              ;
-   reg             is_capturing              ;
+   reg             capturing                 ;
    reg             adc_ready_reg             ;
 
 
@@ -278,18 +278,18 @@ module red_pitaya_scope
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0) begin
          adc_wp      <= {RSZ{1'b1}}; // point to -1st entry, as we increment this pointer before the first post-trigger write.
-      adc_we      <=  1'b0      ;
+      adc_we      <=  1'b0;
       adc_wp_trig <= {RSZ{1'b0}};
       adc_wp_cur  <= {RSZ{1'b0}};
-      n_to_capture <= 32'h0      ;
-      is_capturing  <=  1'b0      ;
+      n_to_capture <= 32'h0;
+      capturing  <=  1'b0;
    end
       else begin
-         adc_ready_reg <= adc_we & ~ is_capturing;   // ready if saving values but not triggered
+         adc_ready_reg <= adc_we & ~ capturing;   // ready if saving values but not triggered
          if (adc_arm_do)
            adc_we <= ~post_trig_only;
          //        adc_we <= 1'b1 ;
-         else if (((is_capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delayed reached or reset
+         else if (((capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delayed reached or reset
            adc_we <= 1'b0 ;
 
 
@@ -300,7 +300,7 @@ module red_pitaya_scope
 
          if (adc_rst_do)
            adc_wp_trig <= {RSZ{1'b0}};
-         else if (adc_trig && !is_capturing)
+         else if (adc_trig && !capturing)
            adc_wp_trig <= adc_wp + 1'b1 ; // save write pointer at trigger arrival
 
          if (adc_rst_do)
@@ -311,18 +311,18 @@ module red_pitaya_scope
 
          if (adc_trig)
            begin
-              is_capturing  <= 1'b1 ;
+              capturing  <= 1'b1 ;
               adc_we <= 1'b1;
            end
-         else if ((is_capturing && (n_to_capture == 32'b0)) || adc_rst_do || adc_arm_do) //delayed reached or reset
+         else if ((capturing && (n_to_capture == 32'b0)) || adc_rst_do || adc_arm_do) //delayed reached or reset
            begin
-              is_capturing  <= 1'b0 ;
+              capturing  <= 1'b0 ;
               adc_we <= 1'b0;
            end
 
-         if (is_capturing && adc_we && dec_done)
+         if (capturing && adc_we && dec_done)
            n_to_capture <= n_to_capture + {32{1'b1}} ; // -1
-         else if (!is_capturing)
+         else if (!capturing)
            n_to_capture <= set_dly + dec_rate; // add decimation count to preserve write-enable for the extra cycles required to store the final word
 
       end
@@ -399,7 +399,7 @@ module red_pitaya_scope
 
          if (wen && (addr[19:0]==20'h4))
            set_trig_src <= wdata[3:0] ;
-         else if (((is_capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
+         else if (((capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
            set_trig_src <= 4'h0 ;
 
          case (set_trig_src)
