@@ -1,12 +1,12 @@
 /**
- * $Id: red_pitaya_scope.v 965 2014-01-24 13:39:56Z matej.oblak $
- *
  * @brief Red Pitaya oscilloscope application, used for capturing ADC data
  *        into BRAMs, which can be later read by SW.
  *
  * @Author Matej Oblak
+ * @Author John Brzustowski
  *
  * (c) Red Pitaya  http://www.redpitaya.com
+ * (c) John Brzustowski
  *
  * This part of code is written in Verilog hardware description language (HDL).
  * Please visit http://en.wikipedia.org/wiki/Verilog
@@ -16,29 +16,39 @@
 /**
  * GENERAL DESCRIPTION:
  *
- * This is simple data aquisition module, primerly used for scilloscope
- * application. It consists from three main parts.
- *
+ * This is a simple data aquisition module that captures raw signal on 4 channels
+ * (2 fast ADC, 2 slow ADC), usually in sync with a trigger pulse detected on
+ * ADC B.
  *
  *                 /-----------\            /-----\
  *   ADC CHA --->  | AVG & DEC | ---------> | BUF | --->  SW
  *                 \-----------/            \-----/
  *                   |
- *                /------\
- *  ADC CHB --->  | TRIG |
- *                \------/
+ *                /------\             /-------\
+ *  ADC CHB --->  | TRIG | ----------> | COUNT | --->  SW
+ *                \------/             \-------/
  *
- * Input data is optionaly averaged and decimated via average filter.
+ *                /------\             /-------\
+ * XADC CHA --->  | TRIG | ----------> | COUNT | --->  SW
+ *                \------/             \-------/
  *
- * Trigger section makes triggers from input ADC data or external digital
- * signal. To make trigger from analog signal schmitt trigger is used, external
- * trigger goes first over debouncer, which is separate for pos. and neg. edge.
+ *                /------\             /-------\
+ * XADC CHB --->  | TRIG | ----------> | COUNT | --->  SW
+ *                \------/             \-------/
+ *
+ * Input data is optionaly averaged and decimated.
+ *
+ * The trigger section makes triggers from input ADC data or external digital
+ * signal.  Debouncing is accomplished by use of separate excitation and relaxation
+ * thresholds.  A trigger is detected when its signal level crosses the excitation threshold
+ * in the direction away from the relaxation threshold.  No further triggers are detected
+ * until the signal has crossed the relaxation threshold.  See trigger_gen.v
  *
  * After arming, detection of a trigger begins writing of decimated / averaged / summed
  * data to BRAM buffers.  Summing can happen for decimation rates 1, 2, 3, and 4, because
  * a sum of up to 4 unsigned samples of 14 bits each fits in an unsigned 16 bit word.
  * Averaging can happen for decimation rates 2, 4, 8, 64, 1024, 8192, 65536 because
- * averaging requires only a shift.
+ * it requires only summation followed by a shift.
  * For all other decimation rates n, only decimation is allowed:  the last of each
  * set of n consecutive samples is used.
  */
