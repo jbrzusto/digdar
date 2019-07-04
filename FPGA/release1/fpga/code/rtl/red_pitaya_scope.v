@@ -53,6 +53,7 @@
  * set of n consecutive samples is used.
  */
 
+`define OFFSET_TRIG_SOURCE                20'h00004 // Trigger source
 `define OFFSET_DIGDAR_OPTIONS             20'h00014 // bit 0: negate video; bit 1: test mode - use counter instead of ADC output; bit 2: use sum not average when decimating
 
 
@@ -295,9 +296,7 @@ module red_pitaya_scope
          adc_arm_do  <= wen && (addr[19:0]==20'h0) && wdata[0] ; // SW arm
          adc_rst_do  <= wen && (addr[19:0]==20'h0) && wdata[1] ; // SW reset
 
-         if (wen && (addr[19:0]==20'h4))
-           set_trig_src <= wdata[3:0] ;
-         else if (((capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
+         if (((capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
            set_trig_src <= 4'h0 ;
 
          case (set_trig_src)
@@ -333,6 +332,7 @@ module red_pitaya_scope
       end
       else begin
          if (wen) begin
+            if (addr[19:0]==`OFFSET_TRIG_SOURCE)      set_trig_src   <= wdata[   3:0] ;
             if (addr[19:0]==20'h10)   capture_size      <= wdata[32-1:0] ;
             if (addr[19:0]==20'h14)   dec_rate     <= wdata[17-1:0] ;
             if (addr[19:0]==20'h28)   avg_en       <= wdata[     0] ;
