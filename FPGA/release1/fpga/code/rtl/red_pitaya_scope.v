@@ -250,6 +250,7 @@ module red_pitaya_scope
               xadc_b_buf[adc_wp] <= xadc_b ;
               n_to_capture <= n_to_capture + {32{1'b1}} ; // -1
               adc_wp <= adc_wp + 1'b1 ;
+              adc_dec_cnt <= 0;
            end
       end // else: !if(adc_rstn_i == 1'b0 || adc_rst_do)
    end
