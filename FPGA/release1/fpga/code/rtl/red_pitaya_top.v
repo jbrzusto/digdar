@@ -18,7 +18,7 @@
 /**
  * GENERAL DESCRIPTION:
  *
- * Top module connects PS part with rest of Red Pitaya applications.
+ * Top module connects the Processing System with the FPGA
  *
  *
  *
@@ -30,44 +30,18 @@
  *                                          |
  *                                          |
  *                                          |
- *                            /-------\     |
- *                         -> | SCOPE | <---+
- *                         |  \-------/     |
- *                         |                |
- *                         |                |
- *            /--------\   |   /-----\      |
- *   ADC ---> |        | --+-> |     |      |
- *            | ANALOG |       | PID | <----+
- *   DAC <--- |        | <---- |     |      |
- *            \--------/   ^   \-----/      |
- *                         |                |
- *                         |                |
- *                         |  /-------\     |
- *                         -- |  ASG  | <---+
- *                            \-------/     |
- *                                          |
- *                                          |
- *                                          |
- *             /--------\                   |
- *    RX ----> |        |                   |
- *   SATA      | DAISY  | <-----------------+
- *    TX <---- |        |
- *             \--------/
- *               |    |
- *               |    |
- *               (FREE)
+ *            /--------\       /-------\    |
+ *            |        | ----> |       |    |
+ *   ADC ---> | ANALOG |       | SCOPE | <--+
+ *            |        | <---- |       |
+ *            \--------/       \-------/
  *
  *
  *
+ * Inside the analog module, ADC data is translated from unsigned into
+ * two's complement, optionally negated.
  *
- * Inside analog module, ADC data is translated from unsigned into
- * two's complement, optionally negated. Similar is done on DAC data.
- *
- * Scope module stores data from ADC into RAM, arbitrary signal generator (ASG)
- * sends data from RAM to DAC. MIMO PID uses ADC ADC as input and DAC as its output.
- *
- * Daisy chain connects with other boards with fast serial link. Data which is
- * send and received is at the moment undefined. This is left for the user.
+ * The scope module stores data from ADC into RAM.
  *
  */
 
@@ -443,7 +417,6 @@ module red_pitaya_top
    //
    //  Oscilloscope application
 
-   wire trig_asg_out ;
    wire radar_trig ;
    wire acp_trig ;
    wire arp_trig ;
