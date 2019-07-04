@@ -230,7 +230,7 @@ module red_pitaya_scope
 
    assign use_sum = avg_en & digdar_options[2] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
 
-   // Write
+   // Write to BRAM buffers
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0 || adc_rst_do) begin
          adc_wp       <= 'h0 ;
@@ -290,14 +290,9 @@ module red_pitaya_scope
       xadc_b_rd      <= xadc_b_buf[xadc_b_raddr] ;
    end
 
-
-
-
-
    //---------------------------------------------------------------------------------
    //
    //  Trigger source selector
-
 
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0) begin
@@ -318,32 +313,24 @@ module red_pitaya_scope
            4'd2: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
            4'd3: adc_trig <= acp_trig_i    ; // trigger on slow channel A
            4'd4: adc_trig <= arp_trig_i    ; // trigger on slow channel B
-
-           default : adc_trig <= 1'b0          ;
+           default : adc_trig <= 1'b0      ;
          endcase
       end
    end
 
-
-
-
-
-
-
-
-
    //---------------------------------------------------------------------------------
    //
    //  System bus connection
+   //
 
-
+   //  write to FPGA registers
    always @(posedge adc_clk_i) begin
       if (adc_rstn_i == 1'b0) begin
-         capture_size       <=  32'd0      ;
-         dec_rate      <=  17'd1      ;
-         avg_en        <=   1'b1      ;
-         adc_counter   <=  14'h0      ;
+         capture_size   <=  32'd0 ;
+         dec_rate       <=  17'd1 ;
+         avg_en         <=   1'b1 ;
          digdar_options <=  32'h0 ;
+         adc_counter    <=  14'h0 ;
       end
       else begin
          if (wen) begin
@@ -357,10 +344,6 @@ module red_pitaya_scope
    end
 
    // read from FPGA registers and buffers
-
-
-
-
    always @(*) begin
       err <= 1'b0 ;
 
@@ -381,10 +364,6 @@ module red_pitaya_scope
         default : begin ack <= 1'b1;          rdata <=  32'h0                               ; end
       endcase
    end
-
-
-
-
 
    // bridge between ADC and sys clock
    bus_clk_bridge i_bridge
