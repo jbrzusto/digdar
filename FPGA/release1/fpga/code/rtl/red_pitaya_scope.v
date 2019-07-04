@@ -100,7 +100,6 @@ module red_pitaya_scope
 
    reg [16-1:0]      adc_counter; // counter for counting mode
 
-   reg               adc_trig_sw      ;
    reg [   4-1: 0]   set_trig_src     ;
 
 
@@ -290,14 +289,12 @@ module red_pitaya_scope
       if (adc_rstn_i == 1'b0) begin
          adc_arm_do    <= 1'b0 ;
          adc_rst_do    <= 1'b0 ;
-         adc_trig_sw   <= 1'b0 ;
          set_trig_src  <= 4'h0 ;
          adc_trig      <= 1'b0 ;
       end
       else begin
          adc_arm_do  <= wen && (addr[19:0]==20'h0) && wdata[0] ; // SW arm
          adc_rst_do  <= wen && (addr[19:0]==20'h0) && wdata[1] ; // SW reset
-         adc_trig_sw <= wen && (addr[19:0]==20'h4) ; // SW trigger
 
          if (wen && (addr[19:0]==20'h4))
            set_trig_src <= wdata[3:0] ;
@@ -305,7 +302,6 @@ module red_pitaya_scope
            set_trig_src <= 4'h0 ;
 
          case (set_trig_src)
-           4'd1 : adc_trig <= adc_trig_sw   ; // manual
            4'd2: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
            4'd3: adc_trig <= acp_trig_i    ; // trigger on slow channel A
            4'd4: adc_trig <= arp_trig_i    ; // trigger on slow channel B
