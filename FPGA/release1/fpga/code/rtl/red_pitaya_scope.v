@@ -300,6 +300,7 @@ module red_pitaya_scope
            set_trig_src <= 4'h0 ;
 
          case (set_trig_src)
+           4'd1: adc_trig <= adc_arm_do    ; // immediately upon arming
            4'd2: adc_trig <= radar_trig_i  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
            4'd3: adc_trig <= acp_trig_i    ; // trigger on slow channel A
            4'd4: adc_trig <= arp_trig_i    ; // trigger on slow channel B
