@@ -37,7 +37,7 @@
  * connector. Measured values are then exposed to SW.
  *
  * Beside that SW can sets registes which controls logic for PWM DAC (analog module).
- * 
+ *
  */
 
 
@@ -51,12 +51,6 @@ module red_pitaya_ams
    input                 rstn_i , //!< reset - active low
    input [ 5-1: 0]       vinp_i , //!< voltages p
    input [ 5-1: 0]       vinn_i , //!< voltages n
-
-   // PWM DAC
-   output [ 24-1: 0]     dac_a_o , //!< values used for
-   output [ 24-1: 0]     dac_b_o , //!< conversion into PWM signal
-   output [ 24-1: 0]     dac_c_o , //!< 
-   output [ 24-1: 0]     dac_d_o , //!< 
 
    output [ 12-1: 0] xadc_a_o , //!< save copy of latest slow adc value; adc_clock domain
    output [ 12-1: 0] xadc_b_o , //!< save copy of latest slow adc value; adc_clock domain
@@ -75,11 +69,8 @@ module red_pitaya_ams
    output reg            sys_err_o , //!< bus error indicator
    output reg            sys_ack_o          //!< bus acknowledge signal
 
- 
+
 );
-
-
-
 
 
 //---------------------------------------------------------------------------------
@@ -100,11 +91,6 @@ reg   [ 12-1: 0] adc_int_r    ;
 reg   [ 12-1: 0] adc_aux_r    ;
 reg   [ 12-1: 0] adc_ddr_r    ;
 
-reg   [ 24-1: 0] dac_a_r      ;
-reg   [ 24-1: 0] dac_b_r      ;
-reg   [ 24-1: 0] dac_c_r      ;
-reg   [ 24-1: 0] dac_d_r      ;
-
 reg [ 12-1: 0] xadc_a_r     ;
 reg [ 12-1: 0] xadc_b_r     ;
 
@@ -112,27 +98,6 @@ reg  adc_a_strobe_r     ;
 reg  adc_b_strobe_r     ;
 reg  xadc_a_strobe_r     ;
 reg  xadc_b_strobe_r     ;
-   
-always @(posedge sys_clk_i) begin
-   if (sys_rstn_i == 1'b0) begin
-      dac_a_r     <= 24'h0F_0000 ;
-      dac_b_r     <= 24'h4E_0000 ;
-      dac_c_r     <= 24'h75_0000 ;
-      dac_d_r     <= 24'h9C_0000 ;
-      
-   end
-   else begin
-      if (sys_wen_i) begin
-         if (sys_addr_i[19:0]==16'h20)   dac_a_r <= sys_wdata_i[24-1: 0] ;
-         if (sys_addr_i[19:0]==16'h24)   dac_b_r <= sys_wdata_i[24-1: 0] ;
-         if (sys_addr_i[19:0]==16'h28)   dac_c_r <= sys_wdata_i[24-1: 0] ;
-         if (sys_addr_i[19:0]==16'h2C)   dac_d_r <= sys_wdata_i[24-1: 0] ;
-      end
-   end
-end
-
-
-
 
 wire ack = sys_wen_i || sys_ren_i ;
 
@@ -146,11 +111,6 @@ always @(posedge sys_clk_i) begin
      20'h0000C : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-12{1'b0}}, adc_d_r}          ; end
      20'h00010 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-12{1'b0}}, adc_v_r}          ; end
 
-     20'h00020 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-24{1'b0}}, dac_a_r}          ; end
-     20'h00024 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-24{1'b0}}, dac_b_r}          ; end
-     20'h00028 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-24{1'b0}}, dac_c_r}          ; end
-     20'h0002C : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-24{1'b0}}, dac_d_r}          ; end
-
      20'h00030 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-12{1'b0}}, adc_temp_r}       ; end
      20'h00034 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-12{1'b0}}, adc_pint_r}       ; end
      20'h00038 : begin sys_ack_o <= ack;          sys_rdata_o <= {{32-12{1'b0}}, adc_paux_r}       ; end
@@ -163,20 +123,11 @@ always @(posedge sys_clk_i) begin
    endcase
 end
 
-
-
-assign dac_a_o = dac_a_r ;
-assign dac_b_o = dac_b_r ;
-assign dac_c_o = dac_c_r ;
-assign dac_d_o = dac_d_r ;
-
 assign xadc_a_o = xadc_a_r;
 assign xadc_b_o = xadc_b_r;
-   
+
 assign xadc_a_strobe_o = xadc_a_strobe_r;
 assign xadc_b_strobe_o = xadc_b_strobe_r;
-
-
 
 //---------------------------------------------------------------------------------
 //  XADC
@@ -288,7 +239,7 @@ always @(posedge clk_i) begin
       if (xadc_drp_addr == 7'd16) begin
          adc_b_r <= xadc_drp_dato[15:4]; // ch0 - aif1
          adc_b_strobe_r = 1'b1;
-      end 
+      end
       else begin
         adc_b_strobe_r = 1'b0;
       end
@@ -312,5 +263,5 @@ always @(posedge clk_i) begin
    xadc_a_strobe_r  <= adc_a_strobe_r;
    xadc_b_strobe_r  <= adc_b_strobe_r;
 end
-   
+
 endmodule

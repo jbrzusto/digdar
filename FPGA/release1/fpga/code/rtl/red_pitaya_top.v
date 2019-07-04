@@ -243,9 +243,6 @@ module red_pitaya_top
    //ODDR i_adc_clk_p ( .Q(adc_clk_o[0]), .D1(1'b1), .D2(1'b0), .C(fclk[0]), .CE(1'b1), .R(1'b0), .S(1'b0));
    //ODDR i_adc_clk_n ( .Q(adc_clk_o[1]), .D1(1'b0), .D2(1'b1), .C(fclk[0]), .CE(1'b1), .R(1'b0), .S(1'b0));
 
-   // always negate trigger signal
-   assign adc_neg_b = 1'b1;
-
    wire             ser_clk     ;
    wire             adc_clk     ;
    reg              adc_rstn    ;
@@ -272,7 +269,6 @@ module red_pitaya_top
       .adc_dat_a_o        (  adc_a            ),  // ADC CH1
       .adc_dat_b_o        (  adc_b            ),  // ADC CH2
       .adc_neg_a_i        (  adc_neg_a        ),  // negate ADC CH1?
-      .adc_neg_b_i        (  adc_neg_b        ),  // negate ADC CH2?
       .adc_clk_o          (  adc_clk          ),  // ADC received clock
       .adc_rst_i          (  adc_rstn         ),  // reset - active low
       .ser_clk_o          (  ser_clk          )   // fast serial clock
@@ -455,14 +451,6 @@ module red_pitaya_top
       );
 
 
-
-
-
-
-
-
-
-
    //---------------------------------------------------------------------------------
    //
    //  Analog mixed signals
@@ -476,12 +464,6 @@ module red_pitaya_top
 
       .vinp_i          (  vinp_i                     ),  // voltages p
       .vinn_i          (  vinn_i                     ),  // voltages n
-
-      .dac_a_o         (  dac_pwm_a                  ),  // values used for
-      .dac_b_o         (  dac_pwm_b                  ),  // conversion into PWM signal
-      .dac_c_o         (  dac_pwm_c                  ),
-      .dac_d_o         (  dac_pwm_d                  ),
-
 
       .xadc_a_o        (  xadc_a                     ),  // latest value from slow ADC a
       .xadc_b_o        (  xadc_b                     ),  // latest value from slow ADC b
@@ -504,11 +486,11 @@ module red_pitaya_top
       );
 
 
-
-
-
-
-
+   //--------------------------------------------------------------------------------
+   //
+   //  Radar specific signals
+   //  - trigger, ACP, ARP
+   //
 
    red_pitaya_digdar i_digdar
      (
