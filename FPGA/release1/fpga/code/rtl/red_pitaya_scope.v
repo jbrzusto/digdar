@@ -53,6 +53,7 @@
  * set of n consecutive samples is used.
  */
 
+`define OFFSET_DIGDAR_OPTIONS             20'h00014 // bit 0: negate video; bit 1: test mode - use counter instead of ADC output; bit 2: use sum not average when decimating
 
 
 module red_pitaya_scope
@@ -95,7 +96,7 @@ module red_pitaya_scope
    reg               ack          ;
    reg               adc_arm_do   ;
    reg               adc_rst_do   ;
-   reg [32-1:0]      digdar_extra_options;
+   reg [32-1:0]      digdar_options;
    reg [ 32-1:0 ]    bogus_reg   ;
 
    reg [16-1:0]      adc_counter; // counter for counting mode
@@ -142,7 +143,7 @@ module red_pitaya_scope
          end
          else if (capturing) begin
             adc_dec_cnt <= adc_dec_cnt + 17'h1 ;
-            adc_a_sum   <= $signed(adc_a_sum) + $signed(adc_a_y) ;
+            adc_a_sum   <= adc_a_sum + adc_a_y ;
             adc_b_sum   <= $signed(adc_b_sum) + $signed(adc_b_i) ;
          end
 
@@ -209,11 +210,11 @@ module red_pitaya_scope
 
    assign capturing_o = capturing;
 
-   assign negate = ~digdar_extra_options[1]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
+   assign negate = ~digdar_options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
 
-   assign counting_mode = digdar_extra_options[3]; // 1 means we use a counter instead of the real adc values
+   assign counting_mode = digdar_options[1]; // 1 means we use a counter instead of the real adc values
 
-   assign use_sum = digdar_extra_options[4] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
+   assign use_sum = avg_en & digdar_options[2] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
 
    // Write
    always @(posedge adc_clk_i) begin
@@ -329,15 +330,15 @@ module red_pitaya_scope
          capture_size       <=  32'd0      ;
          dec_rate      <=  17'd1      ;
          avg_en        <=   1'b1      ;
-         digdar_extra_options <= 32'h0;
          adc_counter   <=  14'h0      ;
+         digdar_options <=  32'h0 ;
       end
       else begin
          if (wen) begin
             if (addr[19:0]==20'h10)   capture_size      <= wdata[32-1:0] ;
             if (addr[19:0]==20'h14)   dec_rate     <= wdata[17-1:0] ;
             if (addr[19:0]==20'h28)   avg_en       <= wdata[     0] ;
-            if (addr[19:0]==20'h50)   digdar_extra_options <= wdata[32-1:0] ;
+            if (addr[19:0]==`OFFSET_DIGDAR_OPTIONS)   digdar_options <= wdata[32-1:0] ;
          end
       end
    end
@@ -357,11 +358,11 @@ module red_pitaya_scope
 
         20'h00018 : begin ack <= 1'b1;          rdata <= 32'h0                               ; end
         20'h0001C : begin ack <= 1'b1;          rdata <= 32'h0                               ; end
+        `OFFSET_DIGDAR_OPTIONS : begin ack <= 1'b1;  rdata <= digdar_options                ; end
 
 
         20'h00028 : begin ack <= 1'b1;          rdata <= {{32- 1{1'b0}}, avg_en}             ; end
 
-        20'h00050 : begin ack <= 1'b1;          rdata <= digdar_extra_options                ; end
         20'h00054 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, adc_counter}        ; end
 
         20'h1???? : begin ack <= adc_rd_dv;     rdata <= adc_a_rd                            ; end // 32 bit register
