@@ -53,8 +53,22 @@
  * set of n consecutive samples is used.
  */
 
+/*
+ * Memory map for reduced scope module
+ * offsets are from 0x40600000, the start of the
+ * scope region of the standard redpitaya memory map.
+ */
+
+`define OFFSET_COMMAND                    20'h00000 // Command register
+// bit     [0] - arm_trigger
+// bit     [1] - rst_wr_state_machine
+// bits [31:2] - reserved
 `define OFFSET_TRIG_SOURCE                20'h00004 // Trigger source
+`define OFFSET_NUM_SAMP                   20'h00008 // number of samples to capture once triggered
+`define OFFSET_DEC_RATE                   20'h0000C // decimation rate; 1 means each sample; 2 means sum/avg/decim 2 samples at a time, ...
+`define OFFSET_AVERAGING                  20'h00010 // bit 0: if true, average or sum samples when decimating
 `define OFFSET_DIGDAR_OPTIONS             20'h00014 // bit 0: negate video; bit 1: test mode - use counter instead of ADC output; bit 2: use sum not average when decimating
+`define OFFSET_ADC_COUNTER                20'h00018 // 14-bit ADC counter used in test mode
 
 
 module red_pitaya_scope
@@ -293,8 +307,8 @@ module red_pitaya_scope
          adc_trig      <= 1'b0 ;
       end
       else begin
-         adc_arm_do  <= wen && (addr[19:0]==20'h0) && wdata[0] ; // SW arm
-         adc_rst_do  <= wen && (addr[19:0]==20'h0) && wdata[1] ; // SW reset
+         adc_arm_do  <= wen && (addr[19:0]==`OFFSET_COMMAND) && wdata[0] ; // SW arm
+         adc_rst_do  <= wen && (addr[19:0]==`OFFSET_COMMAND) && wdata[1] ; // SW reset
 
          if (((capturing || adc_trig) && (n_to_capture == 32'h0)) || adc_rst_do) //delay reached or reset
            set_trig_src <= 4'h0 ;
@@ -334,14 +348,15 @@ module red_pitaya_scope
       else begin
          if (wen) begin
             if (addr[19:0]==`OFFSET_TRIG_SOURCE)      set_trig_src   <= wdata[   3:0] ;
-            if (addr[19:0]==20'h10)   capture_size      <= wdata[32-1:0] ;
-            if (addr[19:0]==20'h14)   dec_rate     <= wdata[17-1:0] ;
-            if (addr[19:0]==20'h28)   avg_en       <= wdata[     0] ;
+            if (addr[19:0]==`OFFSET_NUM_SAMP)         capture_size   <= wdata[32-1:0] ;
+            if (addr[19:0]==`OFFSET_DEC_RATE)         dec_rate       <= wdata[17-1:0] ;
+            if (addr[19:0]==`OFFSET_AVERAGING)        avg_en         <= wdata[     0] ;
             if (addr[19:0]==`OFFSET_DIGDAR_OPTIONS)   digdar_options <= wdata[32-1:0] ;
          end
       end
    end
 
+   // read from FPGA registers and buffers
 
 
 
@@ -350,30 +365,22 @@ module red_pitaya_scope
       err <= 1'b0 ;
 
       casez (addr[19:0])
-        20'h00004 : begin ack <= 1'b1;          rdata <= {{32- 4{1'b0}}, set_trig_src}       ; end
-
-        20'h00010 : begin ack <= 1'b1;          rdata <= {               capture_size}       ; end
-        20'h00014 : begin ack <= 1'b1;          rdata <= {{32-17{1'b0}}, dec_rate}           ; end
-
-        20'h00018 : begin ack <= 1'b1;          rdata <= 32'h0                               ; end
-        20'h0001C : begin ack <= 1'b1;          rdata <= 32'h0                               ; end
+        `OFFSET_TRIG_SOURCE    : begin ack <= 1'b1;  rdata <= {{32- 4{1'b0}}, set_trig_src} ; end
+        `OFFSET_NUM_SAMP       : begin ack <= 1'b1;  rdata <= {               capture_size} ; end
+        `OFFSET_DEC_RATE       : begin ack <= 1'b1;  rdata <= {{32-17{1'b0}}, dec_rate}     ; end
+        `OFFSET_AVERAGING      : begin ack <= 1'b1;  rdata <= {{32- 1{1'b0}}, avg_en}       ; end
         `OFFSET_DIGDAR_OPTIONS : begin ack <= 1'b1;  rdata <= digdar_options                ; end
+        `OFFSET_ADC_COUNTER    : begin ack <= 1'b1;  rdata <= {{32-14{1'b0}}, adc_counter}  ; end
 
+        20'h1???? : begin ack <= adc_rd_dv;     rdata <= adc_a_rd                           ; end // 32 bit register
+        20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}            ; end
 
-        20'h00028 : begin ack <= 1'b1;          rdata <= {{32- 1{1'b0}}, avg_en}             ; end
+        20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}           ; end
+        20'h4???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_b_rd}           ; end
 
-        20'h00054 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, adc_counter}        ; end
-
-        20'h1???? : begin ack <= adc_rd_dv;     rdata <= adc_a_rd                            ; end // 32 bit register
-        20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
-
-        20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}            ; end
-        20'h4???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_b_rd}            ; end
-
-        default : begin ack <= 1'b1;          rdata <=  32'h0                              ; end
+        default : begin ack <= 1'b1;          rdata <=  32'h0                               ; end
       endcase
    end
-
 
 
 
