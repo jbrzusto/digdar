@@ -212,8 +212,6 @@ module red_pitaya_scope
 
    assign negate = ~digdar_extra_options[1]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
 
-   assign read32 = digdar_extra_options[2]; // 1 means reads from buffers are 32 bits, not 16, with specified address in lower 16 bits, next address in upper 16 bits
-
    assign counting_mode = digdar_extra_options[3]; // 1 means we use a counter instead of the real adc values
 
    assign use_sum = digdar_extra_options[4] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
@@ -369,7 +367,7 @@ module red_pitaya_scope
         20'h00050 : begin ack <= 1'b1;          rdata <= digdar_extra_options                ; end
         20'h00054 : begin ack <= 1'b1;          rdata <= {{32-14{1'b0}}, adc_counter}        ; end
 
-        20'h1???? : begin ack <= adc_rd_dv;     rdata <= read32 ? adc_a_rd :  {16'h0, adc_a_word_sel ? adc_a_rd[32-1:16] : adc_a_rd[16-1:0]}             ; end
+        20'h1???? : begin ack <= adc_rd_dv;     rdata <= adc_a_rd                            ; end // 32 bit register
         20'h2???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 2'h0, adc_b_rd}             ; end
 
         20'h3???? : begin ack <= adc_rd_dv;     rdata <= {16'h0, 4'h0, xadc_a_rd}            ; end
