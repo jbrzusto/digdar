@@ -194,7 +194,6 @@ module red_pitaya_scope
    reg [ RSZ-1: 0] adc_wp                    ;
    reg [ RSZ-1: 0] adc_raddr                 ;
    reg [ RSZ-1: 0] adc_a_raddr               ;
-   reg             adc_a_word_sel            ;
 
    reg [ RSZ-1: 0] adc_b_raddr               ;
    reg [ RSZ-1: 0] xadc_a_raddr              ;
@@ -271,7 +270,6 @@ module red_pitaya_scope
       xadc_a_raddr   <= adc_a_raddr     ; // double register
       xadc_b_raddr   <= adc_b_raddr     ; // otherwise memory corruption at reading
       adc_a_rd       <= adc_a_buf[adc_a_raddr[RSZ-1:1]] ;
-      adc_a_word_sel <= adc_a_raddr[0]; // if 1, use higher 16 bits of 32 bit value in adc_a_rd; else use lower 16 bits
       adc_b_rd       <= adc_b_buf[adc_b_raddr] ;
       xadc_a_rd      <= xadc_a_buf[xadc_a_raddr] ;
       xadc_b_rd      <= xadc_b_buf[xadc_b_raddr] ;
