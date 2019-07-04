@@ -238,7 +238,8 @@ module red_pitaya_scope
          if (capturing && dec_done)
            begin
               // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
-              // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits
+              // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits.
+              // We divide adc_wp by two to use it as an index into the 32-bit array.
               if (adc_wp[0])
                 adc_a_buf[adc_wp[RSZ-1:1]] <= {adc_a_dat, adc_a_prev};
               else
