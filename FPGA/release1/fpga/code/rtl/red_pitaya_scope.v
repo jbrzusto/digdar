@@ -150,18 +150,18 @@ module red_pitaya_scope
          if (use_sum) begin
             // for decimation rates <= 4, the sum fits in 16 bits, so we can return
             // that instead of the average, retaining some bits.
-            if (avg_en) begin
+            // This path only used when avg_en is true.
                adc_a_dat <= adc_a_sum[15+0 :  0];
                adc_b_dat <= adc_b_sum[15+0 :  0];
-            end
-            else begin// not average, just return decimated sample
-               adc_a_dat <= adc_a_y;
-               adc_b_dat <= adc_b_i;
-            end
          end
          else begin
+            // not summing.  If avg_en is true and the decimation rate is one of the "special" powers of two,
+            // return the average, truncated toward zero.
+            // Otherwise, we're either not averaging or can't easily compute average because the decimation
+            // rate is not a power of two, just return the bare sample.
+            // The values adc_a_dat and adc_b_dat are only used at the end of the decimation interval
+            // when it is time to save values in the appropriate buffers.
             case (dec_rate & {17{avg_en}})
-              17'h0     : begin adc_a_dat <= adc_a_y;                   adc_b_dat <= adc_b_i;               end
               17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
               17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
               17'h4     : begin adc_a_dat <= adc_a_sum[15+2 :  2];      adc_b_dat <= adc_b_sum[15+2 :  2];  end
@@ -170,7 +170,7 @@ module red_pitaya_scope
               17'h400   : begin adc_a_dat <= adc_a_sum[15+10: 10];      adc_b_dat <= adc_b_sum[15+10: 10];  end
               17'h2000  : begin adc_a_dat <= adc_a_sum[15+13: 13];      adc_b_dat <= adc_b_sum[15+13: 13];  end
               17'h10000 : begin adc_a_dat <= adc_a_sum[15+16: 16];      adc_b_dat <= adc_b_sum[15+16: 16];  end
-              default   : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
+              default   : begin adc_a_dat <= adc_a_y;                   adc_b_dat <= adc_b_i;               end
             endcase
          end
       end
