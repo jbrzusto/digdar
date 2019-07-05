@@ -30,18 +30,18 @@
  *                                          |
  *                                          |
  *                                          |
- *            /--------\       /-------\    |
- *            |        | ----> |       |    |
- *   ADC ---> | ANALOG |       | SCOPE | <--+
- *            |        | <---- |       |
- *            \--------/       \-------/
+ *            /--------\      /--------\    |
+ *            |        | ---> |        |    |
+ *   ADC ---> | ANALOG |      | DIGDAR | <--+
+ *            |        | <--- |        |
+ *            \--------/      \--------/
  *
  *
  *
  * Inside the analog module, ADC data is translated from unsigned into
  * two's complement, optionally negated.
  *
- * The scope module stores data from ADC into RAM.
+ * The digdar module stores data from ADC into RAM.
  *
  */
 
@@ -411,48 +411,6 @@ module red_pitaya_top
 
    //---------------------------------------------------------------------------------
    //
-   //  Oscilloscope application
-
-   wire radar_trig ;
-   wire acp_trig ;
-   wire arp_trig ;
-   wire capturing ;
-
-
-
-   red_pitaya_scope i_scope
-     (
-      // ADC
-      .adc_a_i         (  adc_a                      ),  // CH 1
-      .adc_b_i         (  adc_b                      ),  // CH 2
-      .adc_clk_i       (  adc_clk                    ),  // clock
-      .adc_rstn_i      (  adc_rstn                   ),  // reset - active low
-      .radar_trig_i    (  radar_trig                 ),  // radar trigger (possibly delayed trigger from channel B)
-      .acp_trig_i      (  acp_trig                   ),  // acp trigger (slow ADC A)
-      .arp_trig_i      (  arp_trig                   ),  // arp trigger (slow ADC B)
-
-      .xadc_a          (  xadc_a                     ),  // slow channel 1
-      .xadc_b          (  xadc_b                     ),  // slow channel 2
-
-      .capturing_o     (  capturing                  ),  // asserted while capturing samples
-
-      .negate_o        (  adc_neg_a                  ),  // true if video signal should be negated (taking into account that the pre-amp already does this!)
-      // System bus
-      .sys_clk_i       (  sys_clk                    ),  // clock
-      .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
-      .sys_addr_i      (  sys_addr                   ),  // address
-      .sys_wdata_i     (  sys_wdata                  ),  // write data
-      .sys_sel_i       (  sys_sel                    ),  // write byte select
-      .sys_wen_i       (  sys_wen[1]                 ),  // write enable
-      .sys_ren_i       (  sys_ren[1]                 ),  // read enable
-      .sys_rdata_o     (  sys_rdata[ 1*32+31: 1*32]  ),  // read data
-      .sys_err_o       (  sys_err[1]                 ),  // error indicator
-      .sys_ack_o       (  sys_ack[1]                 )   // acknowledge signal
-      );
-
-
-   //---------------------------------------------------------------------------------
-   //
    //  Analog mixed signals
    //  XADC and slow PWM DAC control
 
@@ -488,8 +446,7 @@ module red_pitaya_top
 
    //--------------------------------------------------------------------------------
    //
-   //  Radar specific signals
-   //  - trigger, ACP, ARP
+   //  Radar digitizer application
    //
 
    red_pitaya_digdar i_digdar
@@ -497,18 +454,15 @@ module red_pitaya_top
       .adc_clk_i       (  adc_clk                    ),  // clock
       .adc_rstn_i      (  adc_rstn                   ),  // clock
 
+      .adc_a_i         (  adc_a                      ),  // CH 1
       .adc_b_i         (  adc_b                      ),  // fast ADC channel B (for generating trigger)
       .xadc_a_i        (  xadc_a                     ),  // latest value from slow ADC a
       .xadc_b_i        (  xadc_b                     ),  // latest value from slow ADC b
 
-      .xadc_a_strobe_i (  xadc_a_strobe              ),  // latest value from slow ADC a
-      .xadc_b_strobe_i (  xadc_b_strobe              ),  // latest value from slow ADC b
+      .xadc_a_strobe_i (  xadc_a_strobe              ),  // true when slow ADC A value is valid
+      .xadc_b_strobe_i (  xadc_b_strobe              ),  // true when slow ADC B value is valid
 
-      .capturing_i     (  capturing                  ),  // true when ADC armed but not yet triggered
-
-      .radar_trig_o    (  radar_trig                 ),  // possibly delayed trigger from ADC channel B
-      .acp_trig_o      (  acp_trig                   ),  // acp trigger
-      .arp_trig_o      (  arp_trig                   ),  // arp trigger
+      .negate_o        (  adc_neg_a                  ),  // true if video signal should be negated (taking into account that the pre-amp already does this!)
 
       // System bus
       .sys_clk_i       (  sys_clk                    ),  // clock
@@ -516,11 +470,11 @@ module red_pitaya_top
       .sys_addr_i      (  sys_addr                   ),  // address
       .sys_wdata_i     (  sys_wdata                  ),  // write data
       .sys_sel_i       (  sys_sel                    ),  // write byte select
-      .sys_wen_i       (  sys_wen[6]                 ),  // write enable
-      .sys_ren_i       (  sys_ren[6]                 ),  // read enable
-      .sys_rdata_o     (  sys_rdata[ 6*32+31: 6*32]  ),  // read data
-      .sys_err_o       (  sys_err[6]                 ),  // error indicator
-      .sys_ack_o       (  sys_ack[6]                 )   // acknowledge signal
+      .sys_wen_i       (  sys_wen[1]                 ),  // write enable
+      .sys_ren_i       (  sys_ren[1]                 ),  // read enable
+      .sys_rdata_o     (  sys_rdata[ 1*32+31: 1*32]  ),  // read data
+      .sys_err_o       (  sys_err[1]                 ),  // error indicator
+      .sys_ack_o       (  sys_ack[1]                 )   // acknowledge signal
 
       );
 
