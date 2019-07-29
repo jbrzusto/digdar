@@ -52,14 +52,15 @@ module trigger_gen
   ( input clock,
     input                          reset,
     input                          enable,
-    input                          strobe,   // only process signal_in when this line asserted
+    input                          strobe, // only process signal_in when this line asserted
     input [width-1:0]              signal_in,
     input [width-1:0]              thresh_relax,
     input [width-1:0]              thresh_excite,
     input [delay_width-1:0]        delay,
     input [age_width-1:0]          latency,
     output reg                     trigger,
-    output reg [counter_width-1:0] counter
+    output reg [counter_width-1:0] counter,
+    output reg [age_width-1:0]     age             // number of clock ticks since assertion of trigger
     );
 
    parameter width         = 12;
@@ -70,7 +71,6 @@ module trigger_gen
 
    reg [2-1:0] 			   state;           // one of STATE values above
    reg [width-1:0] 		   sig_smoothed;    // possibly smoothed version of signal_in
-   reg [age_width-1:0]             age;             // number of clock ticks since assertion of trigger
 
    reg [2-1:0]                     mode;            // one of MODE values above
 
