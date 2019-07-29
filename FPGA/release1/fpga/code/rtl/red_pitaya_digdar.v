@@ -60,7 +60,11 @@ module red_pitaya_digdar
    assign adc_a_y = counting_mode ? adc_counter[16-1:0] : $signed(adc_a_i);
    wire              reset;
 
-   assign reset = adc_rst_do | ~adc_rstn_i ;
+//   assign reset = adc_rst_do | ~adc_rstn_i ;
+//   assign reset = ~adc_rstn_i;
+   assign reset = 0;
+
+
    assign adc_arm_do = command[0];
    assign adc_rst_do = command[1];
 
