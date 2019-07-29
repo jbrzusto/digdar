@@ -47,6 +47,7 @@ module red_pitaya_digdar
    wire              acp_trig               ;
    wire              arp_trig               ;
    wire              trig_trig              ;
+   wire [ 32-1: 0]   acp_age      ;
 
    wire               adc_arm_do   ;
    wire               adc_rst_do   ;
@@ -78,7 +79,8 @@ module red_pitaya_digdar
       .delay(0),
       .latency(acp_latency),
       .trigger(acp_trig),
-      .counter(acp_count)
+      .counter(acp_count),
+      .age(acp_age)
       );
 
    trigger_gen #( .width(12),
@@ -375,6 +377,7 @@ module red_pitaya_digdar
             acp_per_arp         <= acp_count - acp_at_arp;
             acp_at_arp          <= acp_count;
             trig_at_arp         <= trig_count;
+            clock_since_acp_at_arp <= acp_age;
          end
          if (trig_trig) begin
             trig_clock           <= clocks;
