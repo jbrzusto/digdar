@@ -49,7 +49,7 @@ module red_pitaya_digdar
    wire              trig_trig    ;
    wire [ 32-1: 0]   acp_age      ;
 
-   wire              adc_arm_do   ;
+   wire              adc_arm_do   ; // asserted for one clock to arm FPGA for capture
    wire              adc_rst_do   ;
 
    //---------------------------------------------------------------------------------
@@ -61,12 +61,29 @@ module red_pitaya_digdar
    wire              reset;
 
 //   assign reset = adc_rst_do | ~adc_rstn_i ;
-//   assign reset = ~adc_rstn_i;
-   assign reset = 0;
-
+   assign reset = adc_rst_do ;
+//   assign reset = ~adc_rstn_i ;
 
    assign adc_arm_do = command[0];
    assign adc_rst_do = command[1];
+
+   reg [  32-1: 0] samp_countdown            ;
+
+   assign negate = ~options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
+
+   assign avg_en = options[1]; // 1 means average (where possible) instead of simply decimating
+
+   assign counting_mode = options[2]; // 1 means we use a counter instead of the real adc values
+
+   assign use_sum = avg_en & options[3] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
+
+`define STATUS_ARMED_BIT      0 // bit number in status that indicates fpga is armed (waiting for a trigger to begin capture)
+`define STATUS_CAPTURING_BIT  1 // bit number in status that indicates fpga is capturing
+`define STATUS_FIRED_BIT      2 // bit number in status that indicates fpga fired (completed capture after a trigger)
+
+`define armed     status[`STATUS_ARMED_BIT]
+`define capturing status[`STATUS_CAPTURING_BIT]
+`define fired     status[`STATUS_FIRED_BIT]
 
    trigger_gen #( .width(12),
                   .counter_width(32),
@@ -158,18 +175,16 @@ module red_pitaya_digdar
          arp_thresh_excite  <= 32'h07ff;  // signed 12 bits
          arp_thresh_relax   <= 32'h0800;  // signed 12 bits
 
-         command            <= 32'h0;
-
          trig_source        <= 32'h0 ;
          adc_trig           <= 1'b0  ;
          adc_a_sum          <= 32'h0 ;
          adc_b_sum          <= 32'h0 ;
-         adc_dec_cnt        <= 17'h0 ;
+         adc_dec_cnt        <= 'h0   ;
          adc_wp             <= 'h0   ;
          samp_countdown     <= 32'h0 ;
          acp_raw            <= 'h0   ;
          arp_raw            <= 'h0   ;
-         capturing          <= 1'b0  ;
+         status             <= 'h0   ;
 
       end // if (reset)
    end
@@ -181,7 +196,7 @@ module red_pitaya_digdar
    reg [ 14-1: 0]    adc_b_dat     ;
    reg [ 32-1: 0]    adc_a_sum     ;
    reg [ 32-1: 0]    adc_b_sum     ;
-   reg [ 17-1: 0]    adc_dec_cnt   ;
+   reg [ 32-1: 0]    adc_dec_cnt   ;
    wire              dec_done      ;
 
    assign dec_done = adc_dec_cnt >= dec_rate;
@@ -194,9 +209,12 @@ module red_pitaya_digdar
             adc_dec_cnt <= 17'h0;
             adc_a_sum   <= 'h0;
             adc_b_sum   <= 'h0;
+            `armed <= 1'b1;
+            `capturing <= 1'b0;
+            `fired <= 1'b0;
          end
-         else if (capturing) begin
-            adc_dec_cnt <= adc_dec_cnt + 17'h1 ;
+         else if (`capturing) begin
+            adc_dec_cnt <= adc_dec_cnt + 32'h1 ;
             adc_a_sum   <= adc_a_sum + adc_a_y ;
             adc_b_sum   <= $signed(adc_b_sum) + $signed(adc_b_i) ;
          end
@@ -259,31 +277,24 @@ module red_pitaya_digdar
    wire            adc_rd_dv                 ;
    reg             adc_trig                  ;
 
-   reg [  32-1: 0] samp_countdown            ;
-   reg             capturing                 ;
-
-   assign negate = ~options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
-
-   assign avg_en = options[1]; // 1 means average (where possible) instead of simply decimating
-
-   assign counting_mode = options[2]; // 1 means we use a counter instead of the real adc values
-
-   assign use_sum = avg_en & options[3] & (dec_rate <= 4); // when decimation is 4 or less, we can return the sum rather than the average, of samples (16 bits)
-
    // Write to BRAM buffers
    always @(posedge adc_clk_i) begin
       if (!reset) begin
-         if ((capturing || adc_trig) && (samp_countdown == 32'h0)) //delayed reached or reset
-           capturing <= 1'b0 ;
+         if (`capturing && (samp_countdown == 32'h0)) // capture complete
+           begin
+              `capturing <= 1'b0 ;
+              `fired <= 1'b1;
+           end
 
          if (adc_trig)
            begin
-              capturing  <= 1'b1 ;
+              `capturing  <= 1'b1 ;
+              `armed <= 1'b0;
               adc_wp <= 'h0;
               samp_countdown <= num_samp;
            end
 
-         if (capturing && dec_done)
+         if (`capturing && dec_done)
            begin
               // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
               // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits.
@@ -295,7 +306,7 @@ module red_pitaya_digdar
               adc_b_buf[adc_wp] <= adc_b_dat ;
               xadc_a_buf[adc_wp] <= xadc_a_i ;
               xadc_b_buf[adc_wp] <= xadc_b_i ;
-              samp_countdown <= samp_countdown + {32{1'b1}} ; // -1
+              samp_countdown <= samp_countdown - 32'b1 ; // -1
               adc_wp <= adc_wp + 1'b1 ;
               adc_dec_cnt <= 0;
            end
@@ -330,14 +341,11 @@ module red_pitaya_digdar
 
    always @(posedge adc_clk_i) begin
       if (!reset) begin
-         if ((capturing || adc_trig) && (samp_countdown == 32'h0)) //delay reached or reset
-           trig_source <= 32'h0 ;
-
          case (trig_source)
-           32'd1: adc_trig <= adc_arm_do    ; // immediately upon arming
-           32'd2: adc_trig <= trig_trig  ; // trigger on channel B (rising or falling as determined by trig_thresh_excite/relax), but possibly after a delay
-           32'd3: adc_trig <= acp_trig    ; // trigger on slow channel A
-           32'd4: adc_trig <= arp_trig    ; // trigger on slow channel B
+           32'd1: adc_trig <=      1'b1 & `armed ; // trigger immediately upon arming
+           32'd2: adc_trig <= trig_trig & `armed ; // trigger on radar trigger pulse
+           32'd3: adc_trig <= acp_trig  & `armed ; // trigger on acp pulse
+           32'd4: adc_trig <= arp_trig  & `armed ; // trigger on arp pulse
            default : adc_trig <= 1'b0      ;
          endcase
       end
@@ -364,10 +372,10 @@ module red_pitaya_digdar
             casez (addr[19:0])
 `include "generated_setters.v"  // import setter logic generated by ogdar
             endcase // casez (addr[19:0])
-`include "generated_pulsers.v" // import pulser (one-shot) logic generated by ogdar
          end // if (wen)
+`include "generated_pulsers.v" // import pulser (one-shot) logic generated by ogdar
 
-         // metdata: keep track of pulse counts at different trigger events
+         // metadata: keep track of pulse counts at different trigger events
 
          clocks <= clocks + 64'b1;
 
@@ -387,7 +395,7 @@ module red_pitaya_digdar
             trig_clock           <= clocks;
             trig_prev_clock      <= trig_clock;
 
-            if (! capturing) begin
+            if (! `capturing) begin
                // we've been triggered but are not already capturing a
                // previous pulse so save copies of metadata registers
                // for this pulse.  (If trig_trig is true but we are
