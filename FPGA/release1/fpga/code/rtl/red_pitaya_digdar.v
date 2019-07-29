@@ -326,7 +326,7 @@ module red_pitaya_digdar
 
    always @(posedge adc_clk_i) begin
       if (!reset) begin
-         if (((capturing || adc_trig) && (samp_countdown == 32'h0)) || adc_rst_do) //delay reached or reset
+         if ((capturing || adc_trig) && (samp_countdown == 32'h0)) //delay reached or reset
            trig_source <= 32'h0 ;
 
          case (trig_source)
