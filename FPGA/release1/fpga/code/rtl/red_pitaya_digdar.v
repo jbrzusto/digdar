@@ -48,6 +48,9 @@ module red_pitaya_digdar
    wire              arp_trig     ;
    wire              trig_trig    ;
    wire [ 32-1: 0]   acp_age      ;
+   wire [ 32-1: 0]   arp_age      ;
+   wire [ 32-1: 0]   trig_age     ;
+
    wire              reset        ;
 
    reg               adc_arm_do   ; // asserted for one clock to arm FPGA for capture
@@ -114,7 +117,8 @@ module red_pitaya_digdar
       .delay(0),
       .latency(arp_latency),
       .trigger(arp_trig),
-      .counter(arp_count)
+      .counter(arp_count),
+      .age(arp_age)
       );
 
    trigger_gen #( .width(14),
@@ -132,7 +136,8 @@ module red_pitaya_digdar
       .delay(trig_delay),
       .latency(trig_latency),
       .trigger(trig_trig),
-      .counter(trig_count)
+      .counter(trig_count),
+      .age(trig_age)
       );
 
 
