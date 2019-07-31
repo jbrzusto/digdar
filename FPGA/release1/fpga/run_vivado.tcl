@@ -41,6 +41,7 @@ if {[lindex $argv 0] == "clean"} {
 
 if {[lindex $argv 0] == "build"} {
 
+   set_param messaging.defaultLimit 5000
    ## export PS configuration
    generate_target all [get_files  ./vivado/red_pitaya.srcs/sources_1/bd/system/system.bd]
    open_bd_design ./vivado/red_pitaya.srcs/sources_1/bd/system/system.bd
