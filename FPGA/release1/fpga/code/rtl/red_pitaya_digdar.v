@@ -209,9 +209,6 @@ module red_pitaya_digdar
          arp_raw <= {20'h0, xadc_b_i};
 
          if (adc_arm_do) begin // arm
-            adc_dec_cnt <= 17'h0;
-            adc_a_sum   <= 'h0;
-            adc_b_sum   <= 'h0;
             `armed      <= 1'b1;
             `capturing  <= 1'b0;
             `fired      <= 1'b0;
@@ -292,6 +289,9 @@ module red_pitaya_digdar
                  adc_wp <= 'h0;
                  samp_countdown <= num_samp;
                  adc_counter <= 'h0;
+                 adc_dec_cnt <= 17'h0;
+                 adc_a_sum   <= 'h0;
+                 adc_b_sum   <= 'h0;
               end
          end else // ! `capturing
            begin
