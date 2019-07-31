@@ -49,8 +49,8 @@ module red_pitaya_digdar
    wire              trig_trig    ;
    wire [ 32-1: 0]   acp_age      ;
 
-   wire              adc_arm_do   ; // asserted for one clock to arm FPGA for capture
-   wire              adc_rst_do   ;
+   reg               adc_arm_do   ; // asserted for one clock to arm FPGA for capture
+   reg               adc_rst_do   ;
 
    //---------------------------------------------------------------------------------
    //  Input Y (ADC A can be set to counting mode instead of ADC values)
@@ -58,16 +58,12 @@ module red_pitaya_digdar
    wire [ 16-1: 0]   adc_a_y;
 
    assign adc_a_y = counting_mode ? adc_counter[16-1:0] : $signed(adc_a_i);
-   wire              reset;
 
-//   assign reset = adc_rst_do | ~adc_rstn_i ;
-   assign reset = adc_rst_do ;
-//   assign reset = ~adc_rstn_i ;
+   //   assign reset = adc_rst_do | (adc_rstn_i == 1'b0) ;
+//   assign reset = (adc_rstn_i === 1'b0);
+`define reset   (adc_rstn_i == 1'b0)
 
-   assign adc_arm_do = command[0];
-   assign adc_rst_do = command[1];
-
-   reg [  32-1: 0] samp_countdown            ;
+   reg [  32-1: 0]   samp_countdown            ;
 
    assign negate = ~options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
 
@@ -91,7 +87,7 @@ module red_pitaya_digdar
                   ) trigger_gen_acp  // not really a trigger; we're just counting these pulses
      (
       .clock(adc_clk_i),
-      .reset(reset),
+      .reset(`reset),
       .enable(1'b1),
       .strobe(xadc_a_strobe_i),
       .signal_in(xadc_a_i), // signed
@@ -110,7 +106,7 @@ module red_pitaya_digdar
                   ) trigger_gen_arp  // not really a trigger; we're just counting these pulses
      (
       .clock(adc_clk_i),
-      .reset(reset),
+      .reset(`reset),
       .enable(1'b1),
       .strobe(xadc_b_strobe_i),
       .signal_in(xadc_b_i), // signed
@@ -128,7 +124,7 @@ module red_pitaya_digdar
                   ) trigger_gen_trig // this counts trigger pulses and uses them
      (
       .clock(adc_clk_i),
-      .reset(reset),
+      .reset(`reset),
       .enable(1'b1),
       .strobe(1'b1),
       .signal_in(adc_b_i), // signed
@@ -146,7 +142,7 @@ module red_pitaya_digdar
    //
    //  reset
    always @(posedge adc_clk_i) begin
-      if (reset) begin
+      if (`reset) begin
          clocks             <= 64'h0;
 
          acp_clock          <= 64'h0;
@@ -175,6 +171,8 @@ module red_pitaya_digdar
          arp_thresh_excite  <= 32'h07ff;  // signed 12 bits
          arp_thresh_relax   <= 32'h0800;  // signed 12 bits
 
+         dec_rate           <= 32'h1 ;
+
          trig_source        <= 32'h0 ;
          adc_trig           <= 1'b0  ;
          adc_a_sum          <= 32'h0 ;
@@ -186,7 +184,11 @@ module red_pitaya_digdar
          arp_raw            <= 'h0   ;
          status             <= 'h0   ;
 
-      end // if (reset)
+      end
+      else begin
+      end // if (`reset)
+      adc_arm_do <= command[0];
+      adc_rst_do <= command[1];
    end
 
    //---------------------------------------------------------------------------------
@@ -202,52 +204,54 @@ module red_pitaya_digdar
    assign dec_done = adc_dec_cnt >= dec_rate;
 
    always @(posedge adc_clk_i) begin
-      if (! reset) begin
-         adc_counter <= adc_counter + 16'b1;
+      if (! `reset) begin
+         acp_raw <= {20'h0, xadc_a_i};
+         arp_raw <= {20'h0, xadc_b_i};
 
          if (adc_arm_do) begin // arm
             adc_dec_cnt <= 17'h0;
             adc_a_sum   <= 'h0;
             adc_b_sum   <= 'h0;
-            `armed <= 1'b1;
-            `capturing <= 1'b0;
-            `fired <= 1'b0;
+            `armed      <= 1'b1;
+            `capturing  <= 1'b0;
+            `fired      <= 1'b0;
          end
          else if (`capturing) begin
+            adc_counter <= adc_counter + 16'b1;
+            // incorporate new samples into running totals
             adc_dec_cnt <= adc_dec_cnt + 32'h1 ;
             adc_a_sum   <= adc_a_sum + adc_a_y ;
             adc_b_sum   <= $signed(adc_b_sum) + $signed(adc_b_i) ;
-         end
 
-         acp_raw <= {20'h0, xadc_a_i};
-         arp_raw <= {20'h0, xadc_b_i};
-
-         if (use_sum) begin
-            // for decimation rates <= 4, the sum fits in 16 bits, so we can return
-            // that instead of the average, retaining some bits.
-            // This path only used when avg_en is true.
+            // always store the appropriate sum / average / decimated sample in adc_[ab]_dat
+            // so it is available to store in the buffer on the next clock, if appropriate
+            if (use_sum) begin
+               // for decimation rates <= 4, the sum fits in 16 bits, so we can return
+               // that instead of the average, retaining some bits.
+               // This path only used when avg_en is true.
                adc_a_dat <= adc_a_sum[15+0 :  0];
                adc_b_dat <= adc_b_sum[15+0 :  0];
-         end
-         else begin
-            // not summing.  If avg_en is true and the decimation rate is one of the "special" powers of two,
-            // return the average, truncated toward zero.
-            // Otherwise, we're either not averaging or can't easily compute average because the decimation
-            // rate is not a power of two, just return the bare sample.
-            // The values adc_a_dat and adc_b_dat are only used at the end of the decimation interval
-            // when it is time to save values in the appropriate buffers.
-            case (dec_rate & {17{avg_en}})
-              17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
-              17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
-              17'h4     : begin adc_a_dat <= adc_a_sum[15+2 :  2];      adc_b_dat <= adc_b_sum[15+2 :  2];  end
-              17'h8     : begin adc_a_dat <= adc_a_sum[15+3 :  3];      adc_b_dat <= adc_b_sum[15+3 :  3];  end
-              17'h40    : begin adc_a_dat <= adc_a_sum[15+6 :  6];      adc_b_dat <= adc_b_sum[15+6 :  6];  end
-              17'h400   : begin adc_a_dat <= adc_a_sum[15+10: 10];      adc_b_dat <= adc_b_sum[15+10: 10];  end
-              17'h2000  : begin adc_a_dat <= adc_a_sum[15+13: 13];      adc_b_dat <= adc_b_sum[15+13: 13];  end
-              17'h10000 : begin adc_a_dat <= adc_a_sum[15+16: 16];      adc_b_dat <= adc_b_sum[15+16: 16];  end
-              default   : begin adc_a_dat <= adc_a_y;                   adc_b_dat <= adc_b_i;               end
-            endcase
-         end
+            end
+            else begin
+               // not summing.  If avg_en is true and the decimation rate is one of the "special" powers of two,
+               // return the average, truncated toward zero.
+               // Otherwise, we're either not averaging or can't easily compute average because the decimation
+               // rate is not a power of two, just return the bare sample.
+               // The values adc_a_dat and adc_b_dat are only used at the end of the decimation interval
+               // when it is time to save values in the appropriate buffers.
+               case (dec_rate & {17{avg_en}})
+                 17'h1     : begin adc_a_dat <= adc_a_sum[15+0 :  0];      adc_b_dat <= adc_b_sum[15+0 :  0];  end
+                 17'h2     : begin adc_a_dat <= adc_a_sum[15+1 :  1];      adc_b_dat <= adc_b_sum[15+1 :  1];  end
+                 17'h4     : begin adc_a_dat <= adc_a_sum[15+2 :  2];      adc_b_dat <= adc_b_sum[15+2 :  2];  end
+                 17'h8     : begin adc_a_dat <= adc_a_sum[15+3 :  3];      adc_b_dat <= adc_b_sum[15+3 :  3];  end
+                 17'h40    : begin adc_a_dat <= adc_a_sum[15+6 :  6];      adc_b_dat <= adc_b_sum[15+6 :  6];  end
+                 17'h400   : begin adc_a_dat <= adc_a_sum[15+10: 10];      adc_b_dat <= adc_b_sum[15+10: 10];  end
+                 17'h2000  : begin adc_a_dat <= adc_a_sum[15+13: 13];      adc_b_dat <= adc_b_sum[15+13: 13];  end
+                 17'h10000 : begin adc_a_dat <= adc_a_sum[15+16: 16];      adc_b_dat <= adc_b_sum[15+16: 16];  end
+                 default   : begin adc_a_dat <= adc_a_y;                   adc_b_dat <= adc_b_i;               end
+               endcase
+            end
+         end // if (`capturing)
       end
    end
 
@@ -279,44 +283,48 @@ module red_pitaya_digdar
 
    // Write to BRAM buffers
    always @(posedge adc_clk_i) begin
-      if (!reset) begin
-         if (`capturing && (samp_countdown == 32'h0)) // capture complete
+      if (! `reset) begin
+         if (! `capturing) begin
+            if (adc_trig)
+              begin
+                 `capturing  <= 1'b1 ;
+                 `armed  <= 1'b0;
+                 adc_wp <= 'h0;
+                 samp_countdown <= num_samp;
+                 adc_counter <= 'h0;
+              end
+         end else // ! `capturing
            begin
-              `capturing <= 1'b0 ;
-              `fired <= 1'b1;
+              if (samp_countdown == 32'h0) // capture complete
+                begin
+                   `capturing <= 1'b0 ;
+                   `fired <= 1'b1;
+                end
+              else if (dec_done) // decimation done
+                begin
+                   // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
+                   // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits.
+                   // We divide adc_wp by two to use it as an index into the 32-bit array.
+                   if (adc_wp[0])
+                     adc_a_buf[adc_wp[RSZ-1:1]] <= {adc_a_dat, adc_a_prev};
+                   else
+                     adc_a_prev <= adc_a_dat;
+                   adc_b_buf[adc_wp] <= adc_b_dat ;
+                   xadc_a_buf[adc_wp] <= xadc_a_i ;
+                   xadc_b_buf[adc_wp] <= xadc_b_i ;
+                   samp_countdown <= samp_countdown - 32'b1 ; // -1
+                   adc_wp <= adc_wp + 1'b1 ;
+                   adc_dec_cnt <= 0;
+                end // if (dec_done)
            end
-
-         if (adc_trig)
-           begin
-              `capturing  <= 1'b1 ;
-              `armed <= 1'b0;
-              adc_wp <= 'h0;
-              samp_countdown <= num_samp;
-           end
-
-         if (`capturing && dec_done)
-           begin
-              // Note: the adc_a buffer is 32 bits wide, so we only write into it on every 2nd sample
-              // The later sample goes into the upper 16 bits, the earlier one into the lower 16 bits.
-              // We divide adc_wp by two to use it as an index into the 32-bit array.
-              if (adc_wp[0])
-                adc_a_buf[adc_wp[RSZ-1:1]] <= {adc_a_dat, adc_a_prev};
-              else
-                adc_a_prev <= adc_a_dat;
-              adc_b_buf[adc_wp] <= adc_b_dat ;
-              xadc_a_buf[adc_wp] <= xadc_a_i ;
-              xadc_b_buf[adc_wp] <= xadc_b_i ;
-              samp_countdown <= samp_countdown - 32'b1 ; // -1
-              adc_wp <= adc_wp + 1'b1 ;
-              adc_dec_cnt <= 0;
-           end
-      end // if (! reset)
+      end // if (! `reset)
    end
 
-
-   // Read
+   // Return value from buffer and return to processing system.
+   // I don't understand the logic whereby we only reply on the 4th clock
+   // after the read request comes in.
    always @(posedge adc_clk_i) begin
-      if (reset)
+      if ( `reset)
         adc_rval <= 4'h0 ;
       else
         adc_rval <= {adc_rval[2:0], (ren || wen)};
@@ -340,7 +348,7 @@ module red_pitaya_digdar
    //  Trigger source selector
 
    always @(posedge adc_clk_i) begin
-      if (!reset) begin
+      if (! `reset) begin
          case (trig_source)
            32'd1: adc_trig <=      1'b1 & `armed ; // trigger immediately upon arming
            32'd2: adc_trig <= trig_trig & `armed ; // trigger on radar trigger pulse
@@ -367,7 +375,7 @@ module red_pitaya_digdar
    reg               ack          ;
 
    always @(posedge adc_clk_i) begin
-      if (!reset) begin
+      if (! `reset) begin
          if (wen) begin
             casez (addr[19:0])
 `include "generated_setters.v"  // import setter logic generated by ogdar
@@ -375,7 +383,16 @@ module red_pitaya_digdar
          end // if (wen)
 `include "generated_pulsers.v" // import pulser (one-shot) logic generated by ogdar
 
-         // metadata: keep track of pulse counts at different trigger events
+      end // ! `reset
+   end // always @ (posedge adc_clk_i)
+
+   //---------------------------------------------------------------------------------
+   //
+   // metadata: keep track of pulse counts at different trigger events, and save metadata
+   // for a radar trigger pulse
+
+   always @(posedge adc_clk_i) begin
+      if (! `reset ) begin
 
          clocks <= clocks + 64'b1;
 
@@ -415,12 +432,12 @@ module red_pitaya_digdar
                saved_trig_clock             <=  clocks                 ; // NB: not trig_clock, since that's not valid until the next tick.
                saved_trig_prev_clock        <=  trig_clock             ;
             end
-         end // else: !if(adc_rstn_i == 1'b0)
-      end // if (!reset)
+         end // if(trig_trig)
+      end // if (! `reset)
    end
 
    always @(*) begin
-         err <= 1'b0 ;
+      err <= 1'b0 ;
 
       casez (addr[19:0])
 `include "generated_getters.v"  // import getter logic generated by ogdar
