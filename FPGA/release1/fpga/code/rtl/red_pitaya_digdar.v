@@ -187,6 +187,7 @@ module red_pitaya_digdar
          acp_raw            <= 'h0   ;
          arp_raw            <= 'h0   ;
          status             <= 'h0   ;
+         command            <= 'h0   ;
 
       end
       else begin
