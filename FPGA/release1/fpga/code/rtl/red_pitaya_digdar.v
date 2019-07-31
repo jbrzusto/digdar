@@ -204,12 +204,12 @@ module red_pitaya_digdar
    reg [ 32-1: 0]    adc_a_sum     ;
    reg [ 32-1: 0]    adc_b_sum     ;
    reg [ 32-1: 0]    adc_dec_cnt   ;
-   wire              dec_done      ;
-
-   assign dec_done = adc_dec_cnt >= dec_rate;
+   reg               dec_done      ;
 
    always @(posedge adc_clk_i) begin
       if (! reset) begin
+         dec_done <= adc_dec_cnt >= dec_rate;
+
          acp_raw <= {20'h0, xadc_a_i};
          arp_raw <= {20'h0, xadc_b_i};
 
