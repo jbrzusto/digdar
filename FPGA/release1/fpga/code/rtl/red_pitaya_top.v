@@ -416,7 +416,6 @@ module red_pitaya_top
 
    red_pitaya_ams i_ams
      (
-      // power test
       .clk_i           (  adc_clk                    ),  // clock
       .rstn_i          (  adc_rstn                   ),  // reset - active low
 
@@ -477,35 +476,5 @@ module red_pitaya_top
       .sys_ack_o       (  sys_ack[1]                 )   // acknowledge signal
 
       );
-
-
-   //---------------------------------------------------------------------------------
-   //
-   //  Power consumption test
-
-   red_pitaya_test i_test
-     (
-      // power test
-      .clk_i           (  adc_clk                    ),  // clock
-      .rstn_i          (  adc_rstn                   ),  // reset - active low
-
-      .rand_o          (                             ),
-
-      // System bus
-      .sys_clk_i       (  sys_clk                    ),  // clock
-      .sys_rstn_i      (  sys_rstn                   ),  // reset - active low
-      .sys_addr_i      (  sys_addr                   ),  // address
-      .sys_wdata_i     (  sys_wdata                  ),  // write data
-      .sys_sel_i       (  sys_sel                    ),  // write byte select
-      .sys_wen_i       (  sys_wen[7]                 ),  // write enable
-      .sys_ren_i       (  sys_ren[7]                 ),  // read enable
-      .sys_rdata_o     (  sys_rdata[ 7*32+31: 7*32]  ),  // read data
-      .sys_err_o       (  sys_err[7]                 ),  // error indicator
-      .sys_ack_o       (  sys_ack[7]                 )   // acknowledge signal
-      );
-
-   //assign sys_rdata[ 7*32+31: 7*32] = 32'h0 ;
-   //assign sys_err[7] = 1'b0 ;
-   //assign sys_ack[7] = 1'b1 ;
 
 endmodule
