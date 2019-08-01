@@ -355,11 +355,11 @@ module red_pitaya_digdar
    always @(posedge adc_clk_i) begin
       if (! reset) begin
          case (trig_source)
-           32'd1: adc_trig <=      1'b1 & `armed ; // trigger immediately upon arming
-           32'd2: adc_trig <= trig_trig & `armed ; // trigger on radar trigger pulse
-           32'd3: adc_trig <= acp_trig  & `armed ; // trigger on acp pulse
-           32'd4: adc_trig <= arp_trig  & `armed ; // trigger on arp pulse
-           default : adc_trig <= 1'b0      ;
+           32'd1: adc_trig <=      1'b1 ; // trigger immediately upon arming
+           32'd2: adc_trig <= trig_trig ; // trigger on radar trigger pulse
+           32'd3: adc_trig <= acp_trig  ; // trigger on acp pulse
+           32'd4: adc_trig <= arp_trig  ; // trigger on arp pulse
+           default : adc_trig <= 1'b0   ;
          endcase
       end
    end
