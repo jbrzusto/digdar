@@ -417,7 +417,7 @@ module red_pitaya_digdar
             trig_clock           <= clocks;
             trig_prev_clock      <= trig_clock;
 
-            if (! `capturing) begin
+            if (`is_armed) begin
                // we've been triggered but are not already capturing a
                // previous pulse so save copies of metadata registers
                // for this pulse.  (If trig_trig is true but we are
