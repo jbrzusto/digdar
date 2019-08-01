@@ -67,8 +67,8 @@ module red_pitaya_digdar
 
    reg [  32-1: 0]   samp_countdown            ;
 
-   assign negate = ~options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
 
+   assign negate_o = ~options[0]; // sense of negation is reversed from what user intends, since we already have to do one negation to compensate for inverting pre-amp
    assign avg_en = options[1]; // 1 means average (where possible) instead of simply decimating
 
    assign counting_mode = options[2]; // 1 means we use a counter instead of the real adc values
