@@ -147,51 +147,51 @@ module red_pitaya_digdar
    //  reset
    always @(posedge adc_clk_i) begin
       if (reset) begin
-         clocks             <= 64'h0;
+         // clocks             <= 64'h0; // 1694 warnings when leaving this out
 
-         acp_clock          <= 64'h0;
-         acp_prev_clock     <= 64'h0;
+         // acp_clock          <= 64'h0; // 1502 warnings when leaving this out
+         // acp_prev_clock     <= 64'h0; // 1310 warnings when leaving this out
 
-         arp_clock          <= 64'h0;
-         arp_prev_clock     <= 64'h0;
+         // arp_clock          <= 64'h0; // 1118 warnings when leaving this out
+         // arp_prev_clock     <= 64'h0; //  926 warnings when leaving this out (so 192 per 64 bit reg?)
 
-         trig_clock         <= 64'h0;
-         trig_prev_clock    <= 64'h0;
+         // trig_clock         <= 64'h0; // 734 warnings
+         // trig_prev_clock    <= 64'h0;
 
-         acp_per_arp        <= 32'h0;
+         // acp_per_arp        <= 32'h0;
 
-         acp_at_arp         <= 32'h0;
-         trig_at_arp        <= 32'h0;
+         // acp_at_arp         <= 32'h0; // 414 warnings
+         // trig_at_arp        <= 32'h0;
 
-         // set thresholds at extremes to prevent triggering
-         // before client values have been set
+         // to here
+      //    // set thresholds at extremes to prevent triggering
+      //    // before client values have been set
 
-         trig_thresh_excite <= 32'h1fff;  // signed 14 bits
-         trig_thresh_relax  <= 32'h2000;  // signed 14 bits
+      //    trig_thresh_excite <= 32'h1fff;  // signed 14 bits
+      //    trig_thresh_relax  <= 32'h2000;  // signed 14 bits
 
-         acp_thresh_excite  <= 32'h07ff;  // signed 12 bits
-         acp_thresh_relax   <= 32'h0800;  // signed 12 bits
+      //    acp_thresh_excite  <= 32'h07ff;  // signed 12 bits
+      //    acp_thresh_relax   <= 32'h0800;  // signed 12 bits
 
-         arp_thresh_excite  <= 32'h07ff;  // signed 12 bits
-         arp_thresh_relax   <= 32'h0800;  // signed 12 bits
+      //    arp_thresh_excite  <= 32'h07ff;  // signed 12 bits
+      //    arp_thresh_relax   <= 32'h0800;  // signed 12 bits
 
-         dec_rate           <= 32'h1 ;
+      //    dec_rate           <= 32'h1 ;
 
-         trig_source        <= 32'h0 ;
-         adc_trig           <= 1'b0  ;
-         adc_a_sum          <= 32'h0 ;
-         adc_b_sum          <= 32'h0 ;
-         adc_dec_cnt        <= 'h0   ;
-         adc_wp             <= 'h0   ;
-         samp_countdown     <= 32'h0 ;
-         acp_raw            <= 'h0   ;
-         arp_raw            <= 'h0   ;
-         status             <= 'h0   ;
-         command            <= 'h0   ;
+      //    trig_source        <= 32'h0 ;
+      //    adc_trig           <= 1'b0  ;
+      //    adc_a_sum          <= 32'h0 ;
+      //    adc_b_sum          <= 32'h0 ;
+      //    adc_dec_cnt        <= 'h0   ;
+      //    adc_wp             <= 'h0   ;
+      //    samp_countdown     <= 32'h0 ;
+      //    acp_raw            <= 'h0   ;
+      //    arp_raw            <= 'h0   ;
+      //    `set_idle ;
+      //    command            <= 'h0   ;
 
-      end
-      else begin
       end // if (reset)
+
       adc_arm_do <= command[0];
       adc_rst_do <= command[1];
    end
